@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"net"
 
@@ -36,14 +37,17 @@ func New(listener transport.Listener) (s *Server) {
 	return
 }
 
-func (s *Server) Proxy(proxies ...Proxy) {
-	for _, p := range proxies {
-		if s.proxyc != nil {
-			s.proxyc <- p
-		} else {
-			s.proxies.Store(p.Name(), p)
-		}
+func (s *Server) Proxy(p Proxy) (err error) {
+	_, loaded := s.proxies.LoadOrStore(p.Name(), p)
+	if loaded {
+		err = errors.New("already existed")
+		return
 	}
+
+	if s.proxyc != nil {
+		s.proxyc <- p
+	}
+	return
 }
 
 func (s *Server) Proxies() (proxies []Proxy) {
@@ -70,14 +74,14 @@ func (s *Server) ListenAndServe() (err error) {
 
 	go s.listenTransport()
 	s.proxies.Range(func(key, val interface{}) bool {
-		go s.listenProxy(val.(Proxy), false)
+		go s.listenProxy(val.(Proxy))
 		return true
 	})
 
 	for {
 		select {
 		case p := <-s.proxyc:
-			go s.listenProxy(p, true)
+			go s.listenProxy(p)
 		case t := <-s.tranc:
 			go s.handleTransport(t)
 		case c := <-s.connc:
@@ -107,14 +111,7 @@ func (s *Server) listenTransport() {
 	}
 }
 
-func (s *Server) listenProxy(p Proxy, add bool) {
-	if add {
-		_, loaded := s.proxies.LoadOrStore(p.Name(), p)
-		if loaded {
-			return
-		}
-	}
-
+func (s *Server) listenProxy(p Proxy) {
 	defer p.Close()
 	for {
 		c, err := p.Accept()
@@ -150,7 +147,11 @@ func (s *Server) handleConn(c conn) {
 
 func ListenAndServe(listener transport.Listener, proxies ...Proxy) (err error) {
 	s := New(listener)
-	s.Proxy(proxies...)
+	for _, p := range proxies {
+		if err = s.Proxy(p); err != nil {
+			return
+		}
+	}
 	err = s.ListenAndServe()
 	return
 }
