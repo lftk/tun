@@ -9,6 +9,7 @@ import (
 	"github.com/4396/tun/traffic"
 	"github.com/4396/tun/transport"
 	"github.com/golang/sync/syncmap"
+	"github.com/xtaci/smux"
 )
 
 type Proxy interface {
@@ -33,6 +34,7 @@ type Server struct {
 	proxyc  chan Proxy
 	connc   chan conn
 	tconnc  chan net.Conn
+	stc     chan *smux.Stream
 	exitc   chan interface{}
 }
 
@@ -80,6 +82,7 @@ func (s *Server) ListenAndServe() (err error) {
 	s.proxyc = make(chan Proxy, 16)
 	s.connc = make(chan conn, 16)
 	s.tconnc = make(chan net.Conn, 16)
+	s.stc = make(chan *smux.Stream, 16)
 
 	go s.listen(l)
 	s.proxies.Range(func(key, val interface{}) bool {
@@ -95,6 +98,8 @@ func (s *Server) ListenAndServe() (err error) {
 			go s.handleProxyConn(c)
 		case t := <-s.tconnc:
 			go s.handleConn(t)
+		case st := <-s.stc:
+			go s.handleStream(st)
 		case err = <-s.errc:
 			s.Shutdown()
 			return
@@ -140,29 +145,63 @@ func (s *Server) listenProxy(p Proxy) {
 func (s *Server) handleConn(c net.Conn) {
 	fmt.Println("tran", c.RemoteAddr())
 
-	// handshake message
-	var m msg.Message
-	if true {
-		// login and auth
-		a := NewAgent(c)
-		name := c.RemoteAddr().String()
-		_, loaded := s.agents.LoadOrStore(name, a)
+	sess, err := smux.Server(c, smux.DefaultConfig())
+	if err != nil {
+		return
+	}
+	defer sess.Close()
+
+	for {
+		st, err := sess.AcceptStream()
+		if err != nil {
+			return
+		}
+
+		select {
+		case <-s.exitc:
+		default:
+			s.stc <- st
+		}
+	}
+}
+
+func (s *Server) handleStream(st *smux.Stream) {
+	fmt.Println("stream", st.RemoteAddr())
+
+	m, err := msg.Read(st)
+	if err != nil {
+		return
+	}
+
+	if l, b := msg.IsLogin(m); b {
+		fmt.Println("login", l)
+		a := NewAgent(st)
+		_, loaded := s.agents.LoadOrStore(l.Name, a)
 		if loaded {
 			return
 		}
 
 		s.proxies.Range(func(key, val interface{}) bool {
 			ok := val.(Proxy).Bind(a, m)
+			if ok {
+				for i := 0; i < 3; i++ {
+					go msg.Write(st, &msg.Dial{})
+				}
+			}
 			return !ok
 		})
 		return
 	}
 
-	// new workconn
-	name := c.RemoteAddr().String()
-	val, ok := s.agents.Load(name)
-	if ok {
-		val.(*Agent).Put(c)
+	switch mm := m.(type) {
+	case *msg.WorkConn:
+		fmt.Println("work", mm)
+		val, ok := s.agents.Load(mm.Name)
+		if ok {
+			val.(*Agent).Put(st)
+		}
+	default:
+		fmt.Printf("%+v\n", mm)
 	}
 }
 

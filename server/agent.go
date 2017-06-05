@@ -4,6 +4,8 @@ import (
 	"errors"
 	"net"
 	"time"
+
+	"github.com/4396/tun/msg"
 )
 
 type Agent struct {
@@ -14,6 +16,7 @@ type Agent struct {
 
 func NewAgent(conn net.Conn) (a *Agent) {
 	a = &Agent{
+		Conn:  conn,
 		connc: make(chan net.Conn, 16),
 		donec: make(chan interface{}),
 	}
@@ -32,12 +35,13 @@ var (
 func (a *Agent) Dial() (conn net.Conn, err error) {
 	select {
 	case conn = <-a.connc:
-		return
 	case <-a.donec:
 		err = ErrAgentClosed
-		return
 	default:
-		// command the client to dial a new connection
+		err = msg.Write(a.Conn, &msg.Dial{})
+	}
+	if conn != nil || err != nil {
+		return
 	}
 
 	select {

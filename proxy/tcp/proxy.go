@@ -4,6 +4,7 @@ import (
 	"io"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/4396/tun/msg"
@@ -12,9 +13,8 @@ import (
 )
 
 type Proxy struct {
-	sync.RWMutex
 	net.Listener
-	dialer transport.Dialer
+	dialer atomic.Value
 }
 
 func Listen(addr string) (p *Proxy, err error) {
@@ -33,28 +33,21 @@ func (p *Proxy) Name() (name string) {
 }
 
 func (p *Proxy) Unbind(d transport.Dialer) {
-	if p.dialer == d {
-		p.Lock()
-		p.dialer = nil
-		p.Unlock()
+	if p.dialer.Load().(transport.Dialer) == d {
+		p.dialer.Store(d)
 		d.Close()
 	}
 }
 
 func (p *Proxy) Bind(d transport.Dialer, m msg.Message) (ok bool) {
 	// ...
-	p.Lock()
-	p.dialer = d
-	p.Unlock()
+	p.dialer.Store(d)
 	ok = true
 	return
 }
 
 func (p *Proxy) Handle(conn net.Conn, traff traffic.Traffic) (err error) {
-	p.RLock()
-	dialer := p.dialer
-	p.RUnlock()
-
+	dialer := p.dialer.Load().(transport.Dialer)
 	if dialer == nil {
 		return
 	}
