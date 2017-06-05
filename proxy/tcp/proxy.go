@@ -4,14 +4,17 @@ import (
 	"io"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/4396/tun/msg"
+	"github.com/4396/tun/traffic"
 	"github.com/4396/tun/transport"
 )
 
 type Proxy struct {
+	sync.RWMutex
 	net.Listener
-	tran transport.Transport
+	dialer transport.Dialer
 }
 
 func Listen(addr string) (p *Proxy, err error) {
@@ -29,27 +32,59 @@ func (p *Proxy) Name() (name string) {
 	return
 }
 
-func (p *Proxy) Bind(t transport.Transport, m msg.Message) (ok bool) {
+func (p *Proxy) Unbind(d transport.Dialer) {
+	if p.dialer == d {
+		p.Lock()
+		p.dialer = nil
+		p.Unlock()
+		d.Close()
+	}
+}
+
+func (p *Proxy) Bind(d transport.Dialer, m msg.Message) (ok bool) {
 	// ...
-	p.tran = t
+	p.Lock()
+	p.dialer = d
+	p.Unlock()
 	ok = true
 	return
 }
 
-func (p *Proxy) Handle(conn net.Conn) (err error) {
-	if p.tran == nil {
+func (p *Proxy) Handle(conn net.Conn, traff traffic.Traffic) (err error) {
+	p.RLock()
+	dialer := p.dialer
+	p.RUnlock()
+
+	if dialer == nil {
 		return
 	}
 
-	var wg sync.WaitGroup
-	pipe := func(src, dst io.ReadWriter) {
-		io.Copy(dst, src)
+	work, err := dialer.Dial()
+	if err != nil {
+		return
+	}
+	defer work.Close()
+
+	var (
+		in, out int64
+		wg      sync.WaitGroup
+	)
+	pipe := func(src, dst io.ReadWriter, written *int64) {
+		n, _ := io.Copy(dst, src)
+		if written != nil {
+			*written = n
+		}
 		wg.Done()
 	}
 
 	wg.Add(2)
-	go pipe(conn, p.tran)
-	go pipe(p.tran, conn)
+	go pipe(conn, work, &in)
+	go pipe(work, conn, &out)
 	wg.Wait()
+
+	if traff != nil {
+		traff.In(dialer, in, time.Now())
+		traff.Out(dialer, out, time.Now())
+	}
 	return
 }
