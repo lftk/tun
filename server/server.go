@@ -6,6 +6,7 @@ import (
 	"net"
 
 	"github.com/4396/tun/msg"
+	"github.com/4396/tun/traffic"
 	"github.com/4396/tun/transport"
 	"github.com/golang/sync/syncmap"
 )
@@ -13,8 +14,9 @@ import (
 type Proxy interface {
 	net.Listener
 	Name() string
-	Handle(net.Conn) error
-	Bind(transport.Transport, msg.Message) bool
+	Unbind(transport.Dialer)
+	Bind(transport.Dialer, msg.Message) bool
+	Handle(net.Conn, traffic.Traffic) error
 }
 
 type conn struct {
@@ -23,17 +25,19 @@ type conn struct {
 }
 
 type Server struct {
-	Listener transport.Listener
-	proxies  syncmap.Map
-	errc     chan error
-	connc    chan conn
-	proxyc   chan Proxy
-	tranc    chan transport.Transport
-	exitc    chan interface{}
+	Addr    string
+	Traff   traffic.Traffic
+	proxies syncmap.Map
+	agents  syncmap.Map
+	errc    chan error
+	proxyc  chan Proxy
+	connc   chan conn
+	tconnc  chan net.Conn
+	exitc   chan interface{}
 }
 
-func New(listener transport.Listener) (s *Server) {
-	s = &Server{Listener: listener}
+func New(addr string) (s *Server) {
+	s = &Server{Addr: addr}
 	return
 }
 
@@ -66,13 +70,18 @@ func (s *Server) Shutdown() {
 }
 
 func (s *Server) ListenAndServe() (err error) {
+	l, err := net.Listen("tcp", s.Addr)
+	if err != nil {
+		return
+	}
+
 	s.errc = make(chan error, 1)
 	s.exitc = make(chan interface{})
-	s.connc = make(chan conn, 16)
 	s.proxyc = make(chan Proxy, 16)
-	s.tranc = make(chan transport.Transport, 16)
+	s.connc = make(chan conn, 16)
+	s.tconnc = make(chan net.Conn, 16)
 
-	go s.listenTransport()
+	go s.listen(l)
 	s.proxies.Range(func(key, val interface{}) bool {
 		go s.listenProxy(val.(Proxy))
 		return true
@@ -82,10 +91,10 @@ func (s *Server) ListenAndServe() (err error) {
 		select {
 		case p := <-s.proxyc:
 			go s.listenProxy(p)
-		case t := <-s.tranc:
-			go s.handleTransport(t)
 		case c := <-s.connc:
-			go s.handleConn(c)
+			go s.handleProxyConn(c)
+		case t := <-s.tconnc:
+			go s.handleConn(t)
 		case err = <-s.errc:
 			s.Shutdown()
 			return
@@ -95,10 +104,10 @@ func (s *Server) ListenAndServe() (err error) {
 	}
 }
 
-func (s *Server) listenTransport() {
-	defer s.Listener.Close()
+func (s *Server) listen(l net.Listener) {
+	defer l.Close()
 	for {
-		tran, err := s.Listener.Accept()
+		conn, err := l.Accept()
 		if err != nil {
 			return
 		}
@@ -106,7 +115,7 @@ func (s *Server) listenTransport() {
 		select {
 		case <-s.exitc:
 		default:
-			s.tranc <- tran
+			s.tconnc <- conn
 		}
 	}
 }
@@ -128,25 +137,45 @@ func (s *Server) listenProxy(p Proxy) {
 	}
 }
 
-func (s *Server) handleTransport(t transport.Transport) {
-	fmt.Println("tran", t.RemoteAddr())
+func (s *Server) handleConn(c net.Conn) {
+	fmt.Println("tran", c.RemoteAddr())
+
+	// handshake message
 	var m msg.Message
-	s.proxies.Range(func(key, val interface{}) bool {
-		ok := val.(Proxy).Bind(t, m)
-		return !ok
-	})
+	if true {
+		// login and auth
+		a := NewAgent(c)
+		name := c.RemoteAddr().String()
+		_, loaded := s.agents.LoadOrStore(name, a)
+		if loaded {
+			return
+		}
+
+		s.proxies.Range(func(key, val interface{}) bool {
+			ok := val.(Proxy).Bind(a, m)
+			return !ok
+		})
+		return
+	}
+
+	// new workconn
+	name := c.RemoteAddr().String()
+	val, ok := s.agents.Load(name)
+	if ok {
+		val.(*Agent).Put(c)
+	}
 }
 
-func (s *Server) handleConn(c conn) {
+func (s *Server) handleProxyConn(c conn) {
 	fmt.Println("conn", c.RemoteAddr())
-	err := c.Handle(c.Conn)
+	err := c.Handle(c.Conn, s.Traff)
 	if err != nil {
 		// ...
 	}
 }
 
-func ListenAndServe(listener transport.Listener, proxies ...Proxy) (err error) {
-	s := New(listener)
+func ListenAndServe(addr string, proxies ...Proxy) (err error) {
+	s := &Server{Addr: addr}
 	for _, p := range proxies {
 		if err = s.Proxy(p); err != nil {
 			return
