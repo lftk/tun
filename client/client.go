@@ -2,10 +2,11 @@ package client
 
 import (
 	"errors"
-	"fmt"
 	"net"
 
+	"github.com/4396/tun/dialer"
 	"github.com/4396/tun/msg"
+	"github.com/4396/tun/traffic"
 	"github.com/golang/sync/syncmap"
 	"github.com/xtaci/smux"
 )
@@ -16,6 +17,8 @@ type Client struct {
 	lnc   chan net.Listener
 	connc chan net.Conn
 	donec chan interface{}
+
+	dialers syncmap.Map
 }
 
 func Dial(addr string) (c *Client, err error) {
@@ -33,6 +36,10 @@ func Dial(addr string) (c *Client, err error) {
 		sess: sess,
 	}
 	return
+}
+
+func (c *Client) Dialer(name string, dialer dialer.Dialer) {
+	c.dialers.Store(name, dialer)
 }
 
 func (c *Client) Login(name, token string) {
@@ -69,31 +76,31 @@ func (c *Client) Login(name, token string) {
 				return
 			}
 
-			go func(conn net.Conn) {
-				defer conn.Close()
-
-				var start msg.StartWorkConn
-				err = msg.ReadInto(st, &start)
-				if err != nil {
-					return
-				}
-
-				b := make([]byte, 100)
-				for {
-					n, err := conn.Read(b)
-					if err != nil {
-						return
-					}
-					fmt.Println(string(b[:n]))
-
-					_, err = conn.Write([]byte("hello"))
-					if err != nil {
-						return
-					}
-				}
-			}(st)
+			go c.handleConn(name, st)
 		}
 	}
+}
+
+func (c *Client) handleConn(name string, conn net.Conn) {
+	defer conn.Close()
+
+	var start msg.StartWorkConn
+	err := msg.ReadInto(conn, &start)
+	if err != nil {
+		return
+	}
+
+	val, ok := c.dialers.Load(name)
+	if !ok {
+		return
+	}
+
+	work, err := val.(dialer.Dialer).Dial()
+	if err != nil {
+		return
+	}
+
+	traffic.Join(conn, work)
 }
 
 func (c *Client) Listen(l net.Listener) (err error) {

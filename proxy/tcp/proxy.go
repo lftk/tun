@@ -6,8 +6,8 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/4396/tun/dialer"
 	"github.com/4396/tun/traffic"
-	"github.com/4396/tun/transport"
 )
 
 type Proxy struct {
@@ -34,13 +34,13 @@ func (p *Proxy) Name() (name string) {
 	return
 }
 
-func (p *Proxy) Bind(d transport.Dialer) (err error) {
+func (p *Proxy) Bind(d dialer.Dialer) (err error) {
 	p.dialer.Store(d)
 	return
 }
 
-func (p *Proxy) Unbind(d transport.Dialer) (err error) {
-	if p.dialer.Load().(transport.Dialer) == d {
+func (p *Proxy) Unbind(d dialer.Dialer) (err error) {
+	if p.dialer.Load().(dialer.Dialer) == d {
 		p.dialer.Store(d)
 		d.Close()
 	}
@@ -48,7 +48,7 @@ func (p *Proxy) Unbind(d transport.Dialer) (err error) {
 }
 
 func (p *Proxy) Handle(conn net.Conn, traff traffic.Traffic) (err error) {
-	dialer, _ := p.dialer.Load().(transport.Dialer)
+	dialer, _ := p.dialer.Load().(dialer.Dialer)
 	if dialer == nil {
 		return
 	}
