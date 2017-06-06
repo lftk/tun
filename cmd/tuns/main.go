@@ -9,12 +9,12 @@ import (
 )
 
 func main() {
-	p1, err := tcp.Listen("tcp", ":7070")
+	p1, err := tcp.Proxy("tcp", ":7070")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	p2, err := udp.Listen("udp", ":7071")
+	p2, err := udp.Proxy("udp", ":7071")
 	if err != nil {
 		log.Fatal(err)
 	}
