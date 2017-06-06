@@ -11,19 +11,6 @@ type Login struct {
 	Token string
 }
 
-type TcpLogin struct {
-	Login
-}
-
-type UdpLogin struct {
-	Login
-}
-
-type HttpLogin struct {
-	Login
-	Domain string
-}
-
 type Dial struct{}
 
 type WorkConn struct {
@@ -31,20 +18,7 @@ type WorkConn struct {
 	Token string
 }
 
-func IsLogin(msg Message) (l Login, b bool) {
-	b = true
-	switch mm := msg.(type) {
-	case *TcpLogin:
-		l = mm.Login
-	case *UdpLogin:
-		l = mm.Login
-	case *HttpLogin:
-		l = mm.Login
-	default:
-		b = false
-	}
-	return
-}
+type StartWorkConn struct{}
 
 func typeof(v interface{}) reflect.Type {
 	return reflect.TypeOf(v).Elem()
@@ -53,11 +27,10 @@ func typeof(v interface{}) reflect.Type {
 var (
 	msgTypes = make(map[reflect.Type]int8)
 	typeMsgs = []reflect.Type{
-		typeof((*TcpLogin)(nil)),
-		typeof((*UdpLogin)(nil)),
-		typeof((*HttpLogin)(nil)),
+		typeof((*Login)(nil)),
 		typeof((*Dial)(nil)),
 		typeof((*WorkConn)(nil)),
+		typeof((*StartWorkConn)(nil)),
 	}
 )
 

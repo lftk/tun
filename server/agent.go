@@ -32,7 +32,7 @@ var (
 	ErrNoEnoughConn = errors.New("No enough conn")
 )
 
-func (a *Agent) Dial() (conn net.Conn, err error) {
+func (a *Agent) dial() (conn net.Conn, err error) {
 	select {
 	case conn = <-a.connc:
 	case <-a.donec:
@@ -50,6 +50,13 @@ func (a *Agent) Dial() (conn net.Conn, err error) {
 		err = ErrAgentClosed
 	case <-time.After(time.Second):
 		err = ErrNoEnoughConn
+	}
+	return
+}
+
+func (a *Agent) Dial() (conn net.Conn, err error) {
+	if conn, err = a.dial(); err == nil {
+		err = msg.Write(conn, &msg.StartWorkConn{})
 	}
 	return
 }

@@ -41,11 +41,9 @@ func (c *Client) Login(name, token string) {
 		return
 	}
 
-	err = msg.Write(st, &msg.TcpLogin{
-		Login: msg.Login{
-			Name:  name,
-			Token: token,
-		},
+	err = msg.Write(st, &msg.Login{
+		Name:  name,
+		Token: token,
 	})
 	if err != nil {
 		return
@@ -73,6 +71,13 @@ func (c *Client) Login(name, token string) {
 
 			go func(conn net.Conn) {
 				defer conn.Close()
+
+				var start msg.StartWorkConn
+				err = msg.ReadInto(st, &start)
+				if err != nil {
+					return
+				}
+
 				b := make([]byte, 100)
 				for {
 					n, err := conn.Read(b)

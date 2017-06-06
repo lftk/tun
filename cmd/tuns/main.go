@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	p, err := tcp.Listen(":7070")
+	p, err := tcp.Listen("name", ":7070")
 	if err != nil {
 		log.Fatal(err)
 	}

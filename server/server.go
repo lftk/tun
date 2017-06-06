@@ -15,8 +15,8 @@ import (
 type Proxy interface {
 	net.Listener
 	Name() string
-	Unbind(transport.Dialer)
-	Bind(transport.Dialer, msg.Message) bool
+	Bind(transport.Dialer) error
+	Unbind(transport.Dialer) error
 	Handle(net.Conn, traffic.Traffic) error
 }
 
@@ -173,27 +173,23 @@ func (s *Server) handleStream(st *smux.Stream) {
 		return
 	}
 
-	if l, b := msg.IsLogin(m); b {
-		fmt.Println("login", l)
+	switch mm := m.(type) {
+	case *msg.Login:
+		fmt.Println("login", mm)
+
+		val, ok := s.proxies.Load(mm.Name)
+		if !ok {
+			return
+		}
+
 		a := NewAgent(st)
-		_, loaded := s.agents.LoadOrStore(l.Name, a)
+		_, loaded := s.agents.LoadOrStore(mm.Name, a)
 		if loaded {
 			return
 		}
 
-		s.proxies.Range(func(key, val interface{}) bool {
-			ok := val.(Proxy).Bind(a, m)
-			if ok {
-				for i := 0; i < 3; i++ {
-					go msg.Write(st, &msg.Dial{})
-				}
-			}
-			return !ok
-		})
-		return
-	}
-
-	switch mm := m.(type) {
+		err = val.(Proxy).Bind(a)
+		// ...
 	case *msg.WorkConn:
 		fmt.Println("work", mm)
 		val, ok := s.agents.Load(mm.Name)

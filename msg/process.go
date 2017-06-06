@@ -11,10 +11,10 @@ var MaxMsgLength int64 = 10240
 func readMsg(r io.Reader) (t byte, b []byte, err error) {
 	var (
 		n  int64
-		b1 = make([]byte, 1)
+		b1 [1]byte
 	)
 
-	_, err = r.Read(b1)
+	_, err = r.Read(b1[:])
 	if err != nil {
 		return
 	}

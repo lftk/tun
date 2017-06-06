@@ -5,44 +5,45 @@ import (
 	"net"
 	"sync"
 	"sync/atomic"
-	"time"
 
-	"github.com/4396/tun/msg"
 	"github.com/4396/tun/traffic"
 	"github.com/4396/tun/transport"
 )
 
 type Proxy struct {
 	net.Listener
+	name   string
 	dialer atomic.Value
 }
 
-func Listen(addr string) (p *Proxy, err error) {
+func Listen(name, addr string) (p *Proxy, err error) {
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		return
 	}
 
-	p = &Proxy{Listener: listener}
+	p = &Proxy{
+		name:     name,
+		Listener: listener,
+	}
 	return
 }
 
 func (p *Proxy) Name() (name string) {
-	name = p.Addr().String()
+	name = p.name
 	return
 }
 
-func (p *Proxy) Unbind(d transport.Dialer) {
+func (p *Proxy) Bind(d transport.Dialer) (err error) {
+	p.dialer.Store(d)
+	return
+}
+
+func (p *Proxy) Unbind(d transport.Dialer) (err error) {
 	if p.dialer.Load().(transport.Dialer) == d {
 		p.dialer.Store(d)
 		d.Close()
 	}
-}
-
-func (p *Proxy) Bind(d transport.Dialer, m msg.Message) (ok bool) {
-	// ...
-	p.dialer.Store(d)
-	ok = true
 	return
 }
 
@@ -76,8 +77,8 @@ func (p *Proxy) Handle(conn net.Conn, traff traffic.Traffic) (err error) {
 	wg.Wait()
 
 	if traff != nil {
-		traff.In(dialer, in, time.Now())
-		traff.Out(dialer, out, time.Now())
+		traff.In(p.Name(), in)
+		traff.Out(p.Name(), out)
 	}
 	return
 }
