@@ -23,6 +23,7 @@ func Join(dialer dialer.Dialer, conn net.Conn) (in, out int64, err error) {
 	if err != nil {
 		return
 	}
+	defer work.Close()
 
 	var (
 		errs [2]error

@@ -37,6 +37,7 @@ func (p *listener) Unbind(d dialer.Dialer) error {
 }
 
 func (p *listener) Handle(conn net.Conn, traff traffic.Traffic) (err error) {
+	defer conn.Close()
 	dialer, _ := p.dialer.Load().(dialer.Dialer)
 	if dialer == nil {
 		err = errors.New("Not bind dialer")

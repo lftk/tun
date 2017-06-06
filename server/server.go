@@ -1,7 +1,6 @@
 package server
 
 import (
-	"errors"
 	"fmt"
 	"net"
 
@@ -13,54 +12,33 @@ import (
 )
 
 type Server struct {
-	Addr    string
-	Traff   traffic.Traffic
-	proxies syncmap.Map
-	agents  syncmap.Map
-	errc    chan error
-	proxyc  chan proxy.Proxy
-	connc   chan proxyConn
-	tconnc  chan net.Conn
-	stc     chan *smux.Stream
-	exitc   chan interface{}
+	Addr   string
+	proxy  proxy.Service
+	agents syncmap.Map
+	errc   chan error
+	connc  chan net.Conn
+	stc    chan *smux.Stream
+	donec  chan interface{}
 }
 
-type proxyConn struct {
-	proxy.Proxy
-	net.Conn
+func (s *Server) Proxy(p proxy.Proxy) error {
+	return s.proxy.Proxy(p)
 }
 
-func New(addr string) (s *Server) {
-	s = &Server{Addr: addr}
-	return
+func (s *Server) Proxies() []proxy.Proxy {
+	return s.proxy.Proxies()
 }
 
-func (s *Server) Proxy(p proxy.Proxy) (err error) {
-	_, loaded := s.proxies.LoadOrStore(p.Name(), p)
-	if loaded {
-		err = errors.New("already existed")
-		return
-	}
-
-	if s.proxyc != nil {
-		s.proxyc <- p
-	}
-	return
-}
-
-func (s *Server) Proxies() (proxies []proxy.Proxy) {
-	s.proxies.Range(func(key, val interface{}) bool {
-		proxies = append(proxies, val.(proxy.Proxy))
-		return true
-	})
-	return
+func (s *Server) Traffic(traff traffic.Traffic) {
+	s.proxy.Traff = traff
 }
 
 func (s *Server) Shutdown() {
-	if s.exitc != nil {
-		close(s.exitc)
-		s.exitc = nil
+	if s.donec != nil {
+		close(s.donec)
+		s.donec = nil
 	}
+	s.proxy.Shutdown()
 }
 
 func (s *Server) ListenAndServe() (err error) {
@@ -70,32 +48,23 @@ func (s *Server) ListenAndServe() (err error) {
 	}
 
 	s.errc = make(chan error, 1)
-	s.exitc = make(chan interface{})
-	s.proxyc = make(chan proxy.Proxy, 16)
-	s.connc = make(chan proxyConn, 16)
-	s.tconnc = make(chan net.Conn, 16)
+	s.donec = make(chan interface{})
+	s.connc = make(chan net.Conn, 16)
 	s.stc = make(chan *smux.Stream, 16)
 
 	go s.listen(l)
-	s.proxies.Range(func(key, val interface{}) bool {
-		go s.listenProxy(val.(proxy.Proxy))
-		return true
-	})
+	go s.proxy.Serve()
 
 	for {
 		select {
-		case p := <-s.proxyc:
-			go s.listenProxy(p)
 		case c := <-s.connc:
-			go s.handleProxyConn(c)
-		case t := <-s.tconnc:
-			go s.handleClientConn(t)
+			go s.handleConn(c)
 		case st := <-s.stc:
 			go s.handleStream(st)
 		case err = <-s.errc:
 			s.Shutdown()
 			return
-		case <-s.exitc:
+		case <-s.donec:
 			return
 		}
 	}
@@ -106,43 +75,27 @@ func (s *Server) listen(l net.Listener) {
 	for {
 		conn, err := l.Accept()
 		if err != nil {
-			return
-		}
-
-		select {
-		case <-s.exitc:
-		default:
-			s.tconnc <- conn
-		}
-	}
-}
-
-func (s *Server) listenProxy(p proxy.Proxy) {
-	defer p.Close()
-	for {
-		c, err := p.Accept()
-		if err != nil {
 			s.errc <- err
 			return
 		}
 
 		select {
-		case <-s.exitc:
+		case <-s.donec:
 		default:
-			s.connc <- proxyConn{Proxy: p, Conn: c}
+			s.connc <- conn
 		}
 	}
 }
 
-func (s *Server) handleClientConn(c net.Conn) {
+func (s *Server) handleConn(c net.Conn) {
 	fmt.Println("client", c.RemoteAddr())
 
 	sess, err := smux.Server(c, smux.DefaultConfig())
 	if err != nil {
 		return
 	}
-	defer sess.Close()
 
+	defer sess.Close()
 	for {
 		st, err := sess.AcceptStream()
 		if err != nil {
@@ -150,7 +103,7 @@ func (s *Server) handleClientConn(c net.Conn) {
 		}
 
 		select {
-		case <-s.exitc:
+		case <-s.donec:
 		default:
 			s.stc <- st
 		}
@@ -169,35 +122,22 @@ func (s *Server) handleStream(st *smux.Stream) {
 	case *msg.Login:
 		fmt.Println("login", mm)
 
-		val, ok := s.proxies.Load(mm.Name)
-		if !ok {
-			return
-		}
-
 		a := NewAgent(st)
-		_, loaded := s.agents.LoadOrStore(mm.Name, a)
-		if loaded {
+		err = s.proxy.Register(mm.Name, a)
+		if err != nil {
 			return
 		}
 
-		err = val.(proxy.Proxy).Bind(a)
-		// ...
+		s.agents.LoadOrStore(mm.Name, a)
 	case *msg.WorkConn:
 		fmt.Println("work", mm)
+
 		val, ok := s.agents.Load(mm.Name)
 		if ok {
 			val.(*Agent).Put(st)
 		}
 	default:
 		fmt.Printf("%+v\n", mm)
-	}
-}
-
-func (s *Server) handleProxyConn(c proxyConn) {
-	fmt.Println("conn", c.Proxy.Name(), c.Conn.RemoteAddr())
-	err := c.Handle(c.Conn, s.Traff)
-	if err != nil {
-		// ...
 	}
 }
 
