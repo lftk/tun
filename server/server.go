@@ -6,24 +6,11 @@ import (
 	"net"
 
 	"github.com/4396/tun/msg"
+	"github.com/4396/tun/proxy"
 	"github.com/4396/tun/traffic"
-	"github.com/4396/tun/transport"
 	"github.com/golang/sync/syncmap"
 	"github.com/xtaci/smux"
 )
-
-type Proxy interface {
-	net.Listener
-	Name() string
-	Bind(transport.Dialer) error
-	Unbind(transport.Dialer) error
-	Handle(net.Conn, traffic.Traffic) error
-}
-
-type conn struct {
-	Proxy
-	net.Conn
-}
 
 type Server struct {
 	Addr    string
@@ -31,11 +18,16 @@ type Server struct {
 	proxies syncmap.Map
 	agents  syncmap.Map
 	errc    chan error
-	proxyc  chan Proxy
-	connc   chan conn
+	proxyc  chan proxy.Proxy
+	connc   chan proxyConn
 	tconnc  chan net.Conn
 	stc     chan *smux.Stream
 	exitc   chan interface{}
+}
+
+type proxyConn struct {
+	proxy.Proxy
+	net.Conn
 }
 
 func New(addr string) (s *Server) {
@@ -43,7 +35,7 @@ func New(addr string) (s *Server) {
 	return
 }
 
-func (s *Server) Proxy(p Proxy) (err error) {
+func (s *Server) Proxy(p proxy.Proxy) (err error) {
 	_, loaded := s.proxies.LoadOrStore(p.Name(), p)
 	if loaded {
 		err = errors.New("already existed")
@@ -56,9 +48,9 @@ func (s *Server) Proxy(p Proxy) (err error) {
 	return
 }
 
-func (s *Server) Proxies() (proxies []Proxy) {
+func (s *Server) Proxies() (proxies []proxy.Proxy) {
 	s.proxies.Range(func(key, val interface{}) bool {
-		proxies = append(proxies, val.(Proxy))
+		proxies = append(proxies, val.(proxy.Proxy))
 		return true
 	})
 	return
@@ -79,14 +71,14 @@ func (s *Server) ListenAndServe() (err error) {
 
 	s.errc = make(chan error, 1)
 	s.exitc = make(chan interface{})
-	s.proxyc = make(chan Proxy, 16)
-	s.connc = make(chan conn, 16)
+	s.proxyc = make(chan proxy.Proxy, 16)
+	s.connc = make(chan proxyConn, 16)
 	s.tconnc = make(chan net.Conn, 16)
 	s.stc = make(chan *smux.Stream, 16)
 
 	go s.listen(l)
 	s.proxies.Range(func(key, val interface{}) bool {
-		go s.listenProxy(val.(Proxy))
+		go s.listenProxy(val.(proxy.Proxy))
 		return true
 	})
 
@@ -97,7 +89,7 @@ func (s *Server) ListenAndServe() (err error) {
 		case c := <-s.connc:
 			go s.handleProxyConn(c)
 		case t := <-s.tconnc:
-			go s.handleConn(t)
+			go s.handleClientConn(t)
 		case st := <-s.stc:
 			go s.handleStream(st)
 		case err = <-s.errc:
@@ -125,7 +117,7 @@ func (s *Server) listen(l net.Listener) {
 	}
 }
 
-func (s *Server) listenProxy(p Proxy) {
+func (s *Server) listenProxy(p proxy.Proxy) {
 	defer p.Close()
 	for {
 		c, err := p.Accept()
@@ -137,13 +129,13 @@ func (s *Server) listenProxy(p Proxy) {
 		select {
 		case <-s.exitc:
 		default:
-			s.connc <- conn{Proxy: p, Conn: c}
+			s.connc <- proxyConn{Proxy: p, Conn: c}
 		}
 	}
 }
 
-func (s *Server) handleConn(c net.Conn) {
-	fmt.Println("tran", c.RemoteAddr())
+func (s *Server) handleClientConn(c net.Conn) {
+	fmt.Println("client", c.RemoteAddr())
 
 	sess, err := smux.Server(c, smux.DefaultConfig())
 	if err != nil {
@@ -188,7 +180,7 @@ func (s *Server) handleStream(st *smux.Stream) {
 			return
 		}
 
-		err = val.(Proxy).Bind(a)
+		err = val.(proxy.Proxy).Bind(a)
 		// ...
 	case *msg.WorkConn:
 		fmt.Println("work", mm)
@@ -201,7 +193,7 @@ func (s *Server) handleStream(st *smux.Stream) {
 	}
 }
 
-func (s *Server) handleProxyConn(c conn) {
+func (s *Server) handleProxyConn(c proxyConn) {
 	fmt.Println("conn", c.RemoteAddr())
 	err := c.Handle(c.Conn, s.Traff)
 	if err != nil {
@@ -209,7 +201,7 @@ func (s *Server) handleProxyConn(c conn) {
 	}
 }
 
-func ListenAndServe(addr string, proxies ...Proxy) (err error) {
+func ListenAndServe(addr string, proxies ...proxy.Proxy) (err error) {
 	s := &Server{Addr: addr}
 	for _, p := range proxies {
 		if err = s.Proxy(p); err != nil {

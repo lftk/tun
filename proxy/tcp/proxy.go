@@ -48,7 +48,7 @@ func (p *Proxy) Unbind(d transport.Dialer) (err error) {
 }
 
 func (p *Proxy) Handle(conn net.Conn, traff traffic.Traffic) (err error) {
-	dialer := p.dialer.Load().(transport.Dialer)
+	dialer, _ := p.dialer.Load().(transport.Dialer)
 	if dialer == nil {
 		return
 	}
@@ -77,8 +77,8 @@ func (p *Proxy) Handle(conn net.Conn, traff traffic.Traffic) (err error) {
 	wg.Wait()
 
 	if traff != nil {
-		traff.In(p.Name(), in)
-		traff.Out(p.Name(), out)
+		traff.In(p.name, in)
+		traff.Out(p.name, out)
 	}
 	return
 }
