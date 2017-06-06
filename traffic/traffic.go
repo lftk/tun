@@ -1,7 +1,6 @@
 package traffic
 
 import (
-	"errors"
 	"io"
 	"sync"
 )
@@ -10,10 +9,6 @@ type Traffic interface {
 	In(name string, num int64)
 	Out(name string, num int64)
 }
-
-var (
-	ErrBrokenPipe = errors.New("Broken pipe")
-)
 
 func Join(user, conn io.ReadWriter) (in, out int64) {
 	var wg sync.WaitGroup
