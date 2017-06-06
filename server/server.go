@@ -194,7 +194,7 @@ func (s *Server) handleStream(st *smux.Stream) {
 }
 
 func (s *Server) handleProxyConn(c proxyConn) {
-	fmt.Println("conn", c.RemoteAddr())
+	fmt.Println("conn", c.Proxy.Name(), c.Conn.RemoteAddr())
 	err := c.Handle(c.Conn, s.Traff)
 	if err != nil {
 		// ...
