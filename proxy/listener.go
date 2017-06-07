@@ -46,14 +46,58 @@ func (p *listener) Handle(conn net.Conn, traff traffic.Traffic) (err error) {
 		return
 	}
 
-	in, out := Join(dialer, conn)
-	if traff != nil {
-		traff.In(p.name, in)
-		traff.Out(p.name, out)
+	work, err := dialer.Dial()
+	if err != nil {
+		return
 	}
 
-	fmt.Println("Handle succ...", in, out)
+	trafficConn{
+		name:    p.name,
+		Conn:    conn,
+		Traffic: traff,
+	}.Join(work)
+
+	fmt.Println("Handle succ...")
 	return
+}
+
+type trafficConn struct {
+	name string
+	net.Conn
+	traffic.Traffic
+}
+
+func (tc trafficConn) Read(b []byte) (n int, err error) {
+	n, err = tc.Conn.Read(b)
+	if tc.Traffic != nil && n > 0 {
+		tc.Traffic.In(tc.name, b, int64(n))
+	}
+	return
+}
+
+func (tc trafficConn) Write(b []byte) (n int, err error) {
+	n, err = tc.Conn.Write(b)
+	if tc.Traffic != nil && n > 0 {
+		tc.Traffic.Out(tc.name, b, int64(n))
+	}
+	return
+}
+
+func (tc trafficConn) Join(work net.Conn) {
+	var wg sync.WaitGroup
+	pipe := func(from, to net.Conn) {
+		defer func() {
+			from.Close()
+			to.Close()
+			wg.Done()
+		}()
+		io.Copy(to, from)
+		return
+	}
+	wg.Add(2)
+	go pipe(tc, work)
+	go pipe(work, tc)
+	wg.Wait()
 }
 
 func Join(dialer dialer.Dialer, conn net.Conn) (in, out int64) {
@@ -63,7 +107,7 @@ func Join(dialer dialer.Dialer, conn net.Conn) (in, out int64) {
 	}
 
 	var wg sync.WaitGroup
-	pipe := func(from net.Conn, to net.Conn, n *int64) {
+	pipe := func(from, to net.Conn, n *int64) {
 		defer func() {
 			from.Close()
 			to.Close()
