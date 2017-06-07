@@ -4,7 +4,6 @@ import (
 	"log"
 
 	"github.com/4396/tun/proxy/tcp"
-	"github.com/4396/tun/proxy/udp"
 	"github.com/4396/tun/server"
 )
 
@@ -14,7 +13,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	p2, err := udp.Proxy("udp", ":7071")
+	p2, err := tcp.Proxy("ssh", ":7071")
 	if err != nil {
 		log.Fatal(err)
 	}

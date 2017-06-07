@@ -2,6 +2,7 @@ package traffic
 
 import (
 	"io"
+	"net"
 	"sync"
 )
 
@@ -10,16 +11,21 @@ type Traffic interface {
 	Out(name string, num int64)
 }
 
-func Join(user, conn io.ReadWriter) (in, out int64) {
+func Join(user, conn net.Conn) (in, out int64) {
 	var wg sync.WaitGroup
-	pipe := func(src io.Reader, dst io.Writer, n *int64) {
-		*n, _ = io.Copy(dst, src)
-		wg.Done()
+	pipe := func(from net.Conn, to net.Conn, n *int64) {
+		defer func() {
+			from.Close()
+			to.Close()
+			wg.Done()
+		}()
+		*n, _ = io.Copy(to, from)
 		return
 	}
+
 	wg.Add(2)
-	go pipe(user, conn, &in)
-	go pipe(conn, user, &out)
+	go pipe(conn, user, &in)
+	go pipe(user, conn, &out)
 	wg.Wait()
 	return
 }

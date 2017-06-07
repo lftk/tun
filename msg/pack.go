@@ -8,9 +8,9 @@ import (
 	"reflect"
 )
 
-func unpack(t int8, b []byte, in Message) (msg Message, err error) {
+func unpack(t byte, b []byte, in Message) (msg Message, err error) {
 	if in == nil {
-		if t >= int8(len(typeMsgs)) {
+		if t >= byte(len(typeMsgs)) {
 			err = errors.New("Unknown msg type")
 			return
 		}
@@ -18,7 +18,6 @@ func unpack(t int8, b []byte, in Message) (msg Message, err error) {
 	} else {
 		msg = in
 	}
-
 	err = json.Unmarshal(b, &msg)
 	return
 }
@@ -29,7 +28,7 @@ func UnPackInto(b []byte, msg Message) (err error) {
 }
 
 func UnPack(t byte, b []byte) (msg Message, err error) {
-	return unpack(int8(t), b, nil)
+	return unpack(t, b, nil)
 }
 
 func Pack(msg Message) (b []byte, err error) {

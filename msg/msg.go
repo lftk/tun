@@ -25,7 +25,7 @@ func typeof(v interface{}) reflect.Type {
 }
 
 var (
-	msgTypes = make(map[reflect.Type]int8)
+	msgTypes = make(map[reflect.Type]byte)
 	typeMsgs = []reflect.Type{
 		typeof((*Login)(nil)),
 		typeof((*Dial)(nil)),
@@ -36,6 +36,6 @@ var (
 
 func init() {
 	for i, t := range typeMsgs {
-		msgTypes[t] = int8(i)
+		msgTypes[t] = byte(i)
 	}
 }

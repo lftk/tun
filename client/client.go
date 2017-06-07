@@ -2,11 +2,12 @@ package client
 
 import (
 	"errors"
+	"fmt"
 	"net"
 
 	"github.com/4396/tun/dialer"
 	"github.com/4396/tun/msg"
-	"github.com/4396/tun/traffic"
+	"github.com/4396/tun/proxy"
 	"github.com/golang/sync/syncmap"
 	"github.com/xtaci/smux"
 )
@@ -38,11 +39,7 @@ func Dial(addr string) (c *Client, err error) {
 	return
 }
 
-func (c *Client) Dialer(name string, dialer dialer.Dialer) {
-	c.dialers.Store(name, dialer)
-}
-
-func (c *Client) Login(name, token string) {
+func (c *Client) Login(name, token, addr string) {
 	st, err := c.sess.OpenStream()
 	if err != nil {
 		return
@@ -55,6 +52,8 @@ func (c *Client) Login(name, token string) {
 	if err != nil {
 		return
 	}
+
+	c.dialers.Store(name, &TcpDialer{Addr: addr})
 
 	for {
 		m, err := msg.Read(st)
@@ -82,8 +81,6 @@ func (c *Client) Login(name, token string) {
 }
 
 func (c *Client) handleConn(name string, conn net.Conn) {
-	defer conn.Close()
-
 	var start msg.StartWorkConn
 	err := msg.ReadInto(conn, &start)
 	if err != nil {
@@ -95,12 +92,8 @@ func (c *Client) handleConn(name string, conn net.Conn) {
 		return
 	}
 
-	work, err := val.(dialer.Dialer).Dial()
-	if err != nil {
-		return
-	}
-
-	traffic.Join(conn, work)
+	in, out := proxy.Join(val.(dialer.Dialer), conn)
+	fmt.Println("Handle succ...", in, out)
 }
 
 func (c *Client) Listen(l net.Listener) (err error) {

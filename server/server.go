@@ -128,7 +128,7 @@ func (s *Server) handleStream(st *smux.Stream) {
 			return
 		}
 
-		s.agents.LoadOrStore(mm.Name, a)
+		s.agents.Store(mm.Name, a)
 	case *msg.WorkConn:
 		fmt.Println("work", mm)
 
