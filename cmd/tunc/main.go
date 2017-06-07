@@ -24,8 +24,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	go c.Login("tcp", "token", ":3456")
-	//go c.Login("ssh", "token", "")
+	go c.Proxy("tcp", "token", ":3456")
+	//go c.Proxy("ssh", "token", "")
 
+	time.AfterFunc(time.Second*3, func() {
+		//c.Shutdown()
+	})
 	log.Fatal(c.Serve())
 }

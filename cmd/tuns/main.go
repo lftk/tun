@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/4396/tun/proxy/tcp"
 	"github.com/4396/tun/server"
 )
 
@@ -19,12 +18,12 @@ func (t *traffic) Out(name string, b []byte, n int64) {
 }
 
 func main() {
-	p1, err := tcp.Proxy("tcp", ":7070")
+	p1, err := server.TCPProxy("tcp", ":7070")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	p2, err := tcp.Proxy("ssh", ":7071")
+	p2, err := server.TCPProxy("ssh", ":7071")
 	if err != nil {
 		log.Fatal(err)
 	}

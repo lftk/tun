@@ -1,11 +1,9 @@
 package client
 
 import (
-	"errors"
 	"fmt"
 	"net"
 
-	"github.com/4396/tun/dialer"
 	"github.com/4396/tun/msg"
 	"github.com/4396/tun/proxy"
 	"github.com/golang/sync/syncmap"
@@ -13,13 +11,11 @@ import (
 )
 
 type Client struct {
+	Addr  string
+	proxy proxy.Service
 	sess  *smux.Session
 	lns   syncmap.Map
-	lnc   chan net.Listener
-	connc chan net.Conn
 	donec chan interface{}
-
-	dialers syncmap.Map
 }
 
 func Dial(addr string) (c *Client, err error) {
@@ -34,12 +30,14 @@ func Dial(addr string) (c *Client, err error) {
 	}
 
 	c = &Client{
-		sess: sess,
+		Addr:  addr,
+		sess:  sess,
+		donec: make(chan interface{}),
 	}
 	return
 }
 
-func (c *Client) Login(name, token, addr string) {
+func (c *Client) Proxy(name, token, addr string) {
 	st, err := c.sess.OpenStream()
 	if err != nil {
 		return
@@ -53,11 +51,20 @@ func (c *Client) Login(name, token, addr string) {
 		return
 	}
 
-	c.dialers.Store(name, &TcpDialer{Addr: addr})
+	l := NewListener()
+	p := proxy.Wrap(name, l)
+	err = c.proxy.Proxy(p)
+	if err != nil {
+		return
+	}
+
+	c.lns.Store(name, l)
+	p.Bind(NewDialer(addr))
 
 	for {
 		m, err := msg.Read(st)
 		if err != nil {
+			fmt.Println("Proxy", err)
 			return
 		}
 
@@ -75,61 +82,29 @@ func (c *Client) Login(name, token, addr string) {
 				return
 			}
 
-			go c.handleConn(name, st)
+			go c.handleConn(name, st, l)
 		}
 	}
 }
 
-func (c *Client) handleConn(name string, conn net.Conn) {
+func (c *Client) handleConn(name string, conn net.Conn, l *Listener) {
 	var start msg.StartWorkConn
 	err := msg.ReadInto(conn, &start)
 	if err != nil {
 		return
 	}
-
-	val, ok := c.dialers.Load(name)
-	if !ok {
-		return
-	}
-
-	in, out := proxy.Join(val.(dialer.Dialer), conn)
-	fmt.Println("Handle succ...", in, out)
-}
-
-func (c *Client) Listen(l net.Listener) (err error) {
-	_, loaded := c.lns.LoadOrStore(l.Addr().String(), l)
-	if loaded {
-		err = errors.New("already existed")
-		return
-	}
-
-	if c.lnc != nil {
-		c.lnc <- l
-	}
-	return
+	l.Put(conn)
 }
 
 func (c *Client) Serve() (err error) {
-	for {
-		select {
-		case l := <-c.lnc:
-			go c.listen(l)
-		}
-	}
+	err = c.proxy.Serve()
+	return
 }
 
-func (c *Client) listen(l net.Listener) {
-	for {
-		conn, err := l.Accept()
-		if err != nil {
-			return
-		}
-
-		select {
-		case <-c.donec:
-			return
-		default:
-			c.connc <- conn
-		}
-	}
+func (c *Client) Shutdown() {
+	c.proxy.Shutdown()
+	c.lns.Range(func(key, val interface{}) bool {
+		val.(*Listener).Close()
+		return true
+	})
 }
