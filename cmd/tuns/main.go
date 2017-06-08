@@ -18,12 +18,16 @@ func (t *traffic) Out(name string, b []byte, n int64) {
 }
 
 func main() {
-	s := server.Server{Addr: ":8867"}
-
+	s := server.Server{
+		Addr:     ":8867",
+		HttpAddr: ":8082",
+	}
 	s.Traffic(new(traffic))
 
-	s.TCPProxy("tcp", ":7070")
-	s.TCPProxy("ssh", ":7071")
+	s.TcpProxy("tcp", ":7070")
+	s.TcpProxy("ssh", ":7071")
+	s.HttpProxy("web1", "web1.local")
+	s.HttpProxy("web2", "web2.local")
 
 	log.Fatal(s.ListenAndServe())
 }

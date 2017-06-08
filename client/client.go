@@ -51,7 +51,7 @@ func (c *Client) Proxy(name, token, addr string) {
 		return
 	}
 
-	l := NewListener()
+	l := proxy.NewListener()
 	p := proxy.Wrap(name, l)
 	err = c.proxy.Proxy(p)
 	if err != nil {
@@ -87,7 +87,7 @@ func (c *Client) Proxy(name, token, addr string) {
 	}
 }
 
-func (c *Client) handleConn(name string, conn net.Conn, l *Listener) {
+func (c *Client) handleConn(name string, conn net.Conn, l *proxy.Listener) {
 	var start msg.StartWorkConn
 	err := msg.ReadInto(conn, &start)
 	if err != nil {
@@ -103,8 +103,4 @@ func (c *Client) Serve() (err error) {
 
 func (c *Client) Shutdown() {
 	c.proxy.Shutdown()
-	c.lns.Range(func(key, val interface{}) bool {
-		val.(*Listener).Close()
-		return true
-	})
 }

@@ -7,21 +7,24 @@ import (
 	"github.com/4396/tun/msg"
 	"github.com/4396/tun/proxy"
 	"github.com/4396/tun/traffic"
+	"github.com/4396/tun/vhost"
 	"github.com/golang/sync/syncmap"
 	"github.com/xtaci/smux"
 )
 
 type Server struct {
-	Addr   string
-	proxy  proxy.Service
-	agents syncmap.Map
-	errc   chan error
-	connc  chan net.Conn
-	stc    chan *smux.Stream
-	donec  chan interface{}
+	Addr     string
+	HttpAddr string
+	proxy    proxy.Service
+	muxer    vhost.Muxer
+	agents   syncmap.Map
+	errc     chan error
+	connc    chan net.Conn
+	stc      chan *smux.Stream
+	donec    chan interface{}
 }
 
-func (s *Server) TCPProxy(name, addr string) (err error) {
+func (s *Server) TcpProxy(name, addr string) (err error) {
 	p, err := tcpProxy(name, addr)
 	if err == nil {
 		err = s.Proxy(p)
@@ -29,11 +32,10 @@ func (s *Server) TCPProxy(name, addr string) (err error) {
 	return
 }
 
-func (s *Server) HTTPProxy(name, domain string) (err error) {
-	p, err := httpProxy(name, domain)
-	if err == nil {
-		err = s.Proxy(p)
-	}
+func (s *Server) HttpProxy(name, domain string) (err error) {
+	l := s.muxer.Route(domain)
+	p := proxy.Wrap(name, l)
+	err = s.Proxy(p)
 	return
 }
 
@@ -63,12 +65,24 @@ func (s *Server) ListenAndServe() (err error) {
 		return
 	}
 
+	m, err := net.Listen("tcp", s.HttpAddr)
+	if err != nil {
+		l.Close()
+		return
+	}
+
+	err = s.Serve(l, m)
+	return
+}
+
+func (s *Server) Serve(l, m net.Listener) (err error) {
 	s.errc = make(chan error, 1)
 	s.donec = make(chan interface{})
 	s.connc = make(chan net.Conn, 16)
 	s.stc = make(chan *smux.Stream, 16)
 
 	go s.listen(l)
+	go s.muxer.Serve(m)
 	go s.proxy.Serve()
 
 	for {
