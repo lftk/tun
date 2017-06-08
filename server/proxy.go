@@ -6,7 +6,7 @@ import (
 	"github.com/4396/tun/proxy"
 )
 
-func TCPProxy(name, addr string) (p proxy.Proxy, err error) {
+func tcpProxy(name, addr string) (p proxy.Proxy, err error) {
 	listener, err := net.Listen("tcp", addr)
 	if err == nil {
 		p = proxy.Wrap(name, listener)
@@ -14,6 +14,6 @@ func TCPProxy(name, addr string) (p proxy.Proxy, err error) {
 	return
 }
 
-func HTTPProxy(name string) (p proxy.Proxy, err error) {
+func httpProxy(name, domain string) (p proxy.Proxy, err error) {
 	return
 }

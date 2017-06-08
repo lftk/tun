@@ -21,6 +21,22 @@ type Server struct {
 	donec  chan interface{}
 }
 
+func (s *Server) TCPProxy(name, addr string) (err error) {
+	p, err := tcpProxy(name, addr)
+	if err == nil {
+		err = s.Proxy(p)
+	}
+	return
+}
+
+func (s *Server) HTTPProxy(name, domain string) (err error) {
+	p, err := httpProxy(name, domain)
+	if err == nil {
+		err = s.Proxy(p)
+	}
+	return
+}
+
 func (s *Server) Proxy(p proxy.Proxy) error {
 	return s.proxy.Proxy(p)
 }
@@ -139,15 +155,4 @@ func (s *Server) handleStream(st *smux.Stream) {
 	default:
 		fmt.Printf("%+v\n", mm)
 	}
-}
-
-func ListenAndServe(addr string, proxies ...proxy.Proxy) (err error) {
-	s := &Server{Addr: addr}
-	for _, p := range proxies {
-		if err = s.Proxy(p); err != nil {
-			return
-		}
-	}
-	err = s.ListenAndServe()
-	return
 }

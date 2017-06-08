@@ -18,20 +18,12 @@ func (t *traffic) Out(name string, b []byte, n int64) {
 }
 
 func main() {
-	p1, err := server.TCPProxy("tcp", ":7070")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	p2, err := server.TCPProxy("ssh", ":7071")
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	s := server.Server{Addr: ":8867"}
+
 	s.Traffic(new(traffic))
-	s.Proxy(p1)
-	s.Proxy(p2)
+
+	s.TCPProxy("tcp", ":7070")
+	s.TCPProxy("ssh", ":7071")
 
 	log.Fatal(s.ListenAndServe())
 }
