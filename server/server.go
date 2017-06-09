@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"net"
 
@@ -15,92 +16,109 @@ import (
 type Server struct {
 	Addr     string
 	HttpAddr string
-	proxy    proxy.Service
-	muxer    vhost.Muxer
-	agents   syncmap.Map
-	errc     chan error
-	connc    chan net.Conn
-	stc      chan *smux.Stream
-	donec    chan interface{}
+
+	agents  syncmap.Map
+	muxer   vhost.Muxer
+	service proxy.Service
+
+	errc   chan error
+	connc  chan net.Conn
+	hconnc chan net.Conn
+	stc    chan *smux.Stream
 }
 
 func (s *Server) TcpProxy(name, addr string) (err error) {
-	p, err := tcpProxy(name, addr)
-	if err == nil {
-		err = s.Proxy(p)
+	l, err := net.Listen("tcp", addr)
+	if err != nil {
+		return
+	}
+
+	p := proxy.Wrap(name, l)
+	err = s.Proxy(p)
+	if err != nil {
+		l.Close()
 	}
 	return
 }
 
 func (s *Server) HttpProxy(name, domain string) (err error) {
-	l := s.muxer.Route(domain)
+	l := proxy.NewListener()
 	p := proxy.Wrap(name, l)
 	err = s.Proxy(p)
+	if err != nil {
+		return
+	}
+
+	s.muxer.HandleFunc(domain, l.Put)
 	return
 }
 
 func (s *Server) Proxy(p proxy.Proxy) error {
-	return s.proxy.Proxy(p)
+	return s.service.Proxy(p)
 }
 
 func (s *Server) Proxies() []proxy.Proxy {
-	return s.proxy.Proxies()
+	return s.service.Proxies()
 }
 
 func (s *Server) Traffic(traff traffic.Traffic) {
-	s.proxy.Traff = traff
+	s.service.Traff = traff
 }
 
-func (s *Server) Shutdown() {
-	if s.donec != nil {
-		close(s.donec)
-		s.donec = nil
-	}
-	s.proxy.Shutdown()
-}
-
-func (s *Server) ListenAndServe() (err error) {
-	l, err := net.Listen("tcp", s.Addr)
+func (s *Server) ListenAndServe(ctx context.Context) (err error) {
+	var l, h net.Listener
+	l, err = net.Listen("tcp", s.Addr)
 	if err != nil {
 		return
 	}
 
-	m, err := net.Listen("tcp", s.HttpAddr)
-	if err != nil {
-		l.Close()
-		return
+	if s.HttpAddr != "" {
+		h, err = net.Listen("tcp", s.HttpAddr)
+		if err != nil {
+			l.Close()
+			return
+		}
 	}
 
-	err = s.Serve(l, m)
+	err = s.Serve(ctx, l, h)
 	return
 }
 
-func (s *Server) Serve(l, m net.Listener) (err error) {
+func (s *Server) Serve(ctx context.Context, l, h net.Listener) (err error) {
 	s.errc = make(chan error, 1)
-	s.donec = make(chan interface{})
 	s.connc = make(chan net.Conn, 16)
+	s.hconnc = make(chan net.Conn, 16)
 	s.stc = make(chan *smux.Stream, 16)
 
-	go s.listen(l)
-	go s.muxer.Serve(m)
-	go s.proxy.Serve()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	go s.listen(ctx, l, s.connc)
+	if h != nil {
+		go s.listen(ctx, h, s.hconnc)
+	}
+
+	go func() {
+		s.errc <- s.service.Serve(ctx)
+	}()
 
 	for {
 		select {
+		case c := <-s.hconnc:
+			go s.handleHttpConn(ctx, c)
 		case c := <-s.connc:
-			go s.handleConn(c)
-		case st := <-s.stc:
-			go s.handleStream(st)
+			go s.handleConn(ctx, c)
+		case c := <-s.stc:
+			go s.handleStream(ctx, c)
 		case err = <-s.errc:
-			s.Shutdown()
 			return
-		case <-s.donec:
+		case <-ctx.Done():
 			return
 		}
 	}
 }
 
-func (s *Server) listen(l net.Listener) {
+func (s *Server) listen(ctx context.Context, l net.Listener, connc chan<- net.Conn) {
 	defer l.Close()
 	for {
 		conn, err := l.Accept()
@@ -110,14 +128,25 @@ func (s *Server) listen(l net.Listener) {
 		}
 
 		select {
-		case <-s.donec:
+		case <-ctx.Done():
+			return
 		default:
-			s.connc <- conn
+			connc <- conn
 		}
 	}
 }
 
-func (s *Server) handleConn(c net.Conn) {
+func (s *Server) handleHttpConn(ctx context.Context, c net.Conn) {
+	fmt.Println("http", c.RemoteAddr())
+
+	select {
+	case <-ctx.Done():
+	default:
+		s.muxer.Handle(c)
+	}
+}
+
+func (s *Server) handleConn(ctx context.Context, c net.Conn) {
 	fmt.Println("client", c.RemoteAddr())
 
 	sess, err := smux.Server(c, smux.DefaultConfig())
@@ -133,40 +162,45 @@ func (s *Server) handleConn(c net.Conn) {
 		}
 
 		select {
-		case <-s.donec:
+		case <-ctx.Done():
+			return
 		default:
 			s.stc <- st
 		}
 	}
 }
 
-func (s *Server) handleStream(st *smux.Stream) {
+func (s *Server) handleStream(ctx context.Context, st *smux.Stream) {
 	fmt.Println("stream", st.RemoteAddr())
 
-	m, err := msg.Read(st)
-	if err != nil {
-		return
-	}
-
-	switch mm := m.(type) {
-	case *msg.Login:
-		fmt.Println("login", mm)
-
-		a := NewAgent(st)
-		err = s.proxy.Register(mm.Name, a)
+	select {
+	case <-ctx.Done():
+	default:
+		m, err := msg.Read(st)
 		if err != nil {
 			return
 		}
 
-		s.agents.Store(mm.Name, a)
-	case *msg.WorkConn:
-		fmt.Println("work", mm)
+		switch mm := m.(type) {
+		case *msg.Login:
+			fmt.Println("login", mm)
 
-		val, ok := s.agents.Load(mm.Name)
-		if ok {
-			val.(*Agent).Put(st)
+			a := NewAgent(st)
+			err = s.service.Register(mm.Name, a)
+			if err != nil {
+				return
+			}
+
+			s.agents.Store(mm.Name, a)
+		case *msg.WorkConn:
+			fmt.Println("work", mm)
+
+			val, ok := s.agents.Load(mm.Name)
+			if ok {
+				val.(*Agent).Put(st)
+			}
+		default:
+			fmt.Printf("other %+v\n", mm)
 		}
-	default:
-		fmt.Printf("%+v\n", mm)
 	}
 }

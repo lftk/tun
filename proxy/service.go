@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"context"
 	"errors"
 	"net"
 
@@ -23,35 +24,37 @@ type proxyConn struct {
 	net.Conn
 }
 
-func (s *Service) Shutdown() (err error) {
-	if s.donec != nil {
-		close(s.donec)
-		s.donec = nil
-	}
-	return
-}
-
-func (s *Service) Serve() (err error) {
+func (s *Service) Serve(ctx context.Context) (err error) {
 	s.errc = make(chan error, 1)
-	s.donec = make(chan interface{})
-	s.proxyc = make(chan Proxy, 16)
 	s.connc = make(chan proxyConn, 16)
+	s.proxyc = make(chan Proxy, 16)
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer func() {
+		cancel()
+		for {
+			select {
+			case p := <-s.proxyc:
+				p.Close()
+			default:
+			}
+		}
+	}()
 
 	s.proxies.Range(func(key, val interface{}) bool {
-		go s.listenProxy(val.(Proxy))
+		go s.listenProxy(ctx, val.(Proxy))
 		return true
 	})
 
 	for {
 		select {
 		case p := <-s.proxyc:
-			go s.listenProxy(p)
+			go s.listenProxy(ctx, p)
 		case c := <-s.connc:
-			go s.handleConn(c)
+			go s.handleConn(ctx, c)
 		case err = <-s.errc:
-			s.Shutdown()
 			return
-		case <-s.donec:
+		case <-ctx.Done():
 			return
 		}
 	}
@@ -98,7 +101,7 @@ func (s *Service) Unregister(name string, dialer dialer.Dialer) (err error) {
 	return
 }
 
-func (s *Service) listenProxy(p Proxy) {
+func (s *Service) listenProxy(ctx context.Context, p Proxy) {
 	defer p.Close()
 	for {
 		conn, err := p.Accept()
@@ -108,7 +111,7 @@ func (s *Service) listenProxy(p Proxy) {
 		}
 
 		select {
-		case <-s.donec:
+		case <-ctx.Done():
 			return
 		default:
 			s.connc <- proxyConn{p, conn}
@@ -116,9 +119,13 @@ func (s *Service) listenProxy(p Proxy) {
 	}
 }
 
-func (s *Service) handleConn(pc proxyConn) {
-	err := pc.Proxy.Handle(pc.Conn, s.Traff)
-	if err != nil {
-		// ...
+func (s *Service) handleConn(ctx context.Context, pc proxyConn) {
+	select {
+	case <-ctx.Done():
+	default:
+		err := pc.Proxy.Handle(pc.Conn, s.Traff)
+		if err != nil {
+			// ...
+		}
 	}
 }

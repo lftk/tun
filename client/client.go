@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"fmt"
 	"net"
 
@@ -11,11 +12,11 @@ import (
 )
 
 type Client struct {
-	Addr  string
-	proxy proxy.Service
-	sess  *smux.Session
-	lns   syncmap.Map
-	donec chan interface{}
+	Addr    string
+	service proxy.Service
+	sess    *smux.Session
+	lns     syncmap.Map
+	donec   chan interface{}
 }
 
 func Dial(addr string) (c *Client, err error) {
@@ -53,7 +54,7 @@ func (c *Client) Proxy(name, token, addr string) {
 
 	l := proxy.NewListener()
 	p := proxy.Wrap(name, l)
-	err = c.proxy.Proxy(p)
+	err = c.service.Proxy(p)
 	if err != nil {
 		return
 	}
@@ -97,10 +98,8 @@ func (c *Client) handleConn(name string, conn net.Conn, l *proxy.Listener) {
 }
 
 func (c *Client) Serve() (err error) {
-	err = c.proxy.Serve()
+	ctx, cancel := context.WithCancel(context.Background())
+	err = c.service.Serve(ctx)
+	cancel()
 	return
-}
-
-func (c *Client) Shutdown() {
-	c.proxy.Shutdown()
 }

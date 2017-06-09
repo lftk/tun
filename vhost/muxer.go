@@ -8,56 +8,38 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/4396/tun/proxy"
 	"github.com/golang/sync/syncmap"
 )
 
 type Muxer struct {
-	connc     chan net.Conn
-	listeners syncmap.Map
+	connc   chan net.Conn
+	handler syncmap.Map
 }
 
-func (m *Muxer) Route(domain string) net.Listener {
-	listener := proxy.NewListener()
-	actucal, _ := m.listeners.LoadOrStore(domain, listener)
-	return actucal.(net.Listener)
-}
-
-func (m *Muxer) Serve(l net.Listener) (err error) {
-	m.connc = make(chan net.Conn, 16)
-
-	go m.listen(l)
-	for {
-		select {
-		case c := <-m.connc:
-			go m.handleConn(c)
-		}
+func (m *Muxer) HandleFunc(domain string, handle func(net.Conn)) {
+	if handle != nil {
+		m.handler.Store(domain, handle)
+	} else {
+		m.handler.Delete(domain)
 	}
 }
 
-func (m *Muxer) listen(l net.Listener) {
-	defer l.Close()
-	for {
-		conn, err := l.Accept()
-		if err != nil {
-			return
-		}
-
-		m.connc <- conn
-	}
-}
-
-func (m *Muxer) handleConn(c net.Conn) {
+func (m *Muxer) Handle(c net.Conn) {
 	domain, cc, err := SubDomain(c)
-	if err == nil {
-		val, ok := m.listeners.Load(domain)
-		if ok {
-			val.(*proxy.Listener).Put(cc)
-			return
-		}
+	if err != nil {
+		// 500
+		c.Close()
+		return
 	}
-	// ...
-	c.Close()
+
+	val, ok := m.handler.Load(domain)
+	if !ok {
+		// 400
+		cc.Close()
+		return
+	}
+
+	val.(func(net.Conn))(cc)
 }
 
 type bufferConn struct {
