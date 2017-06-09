@@ -26,8 +26,8 @@ func main() {
 
 	s.TcpProxy("tcp", ":7070")
 	s.TcpProxy("ssh", ":7071")
-	s.HttpProxy("web1", "web1.local")
-	s.HttpProxy("web2", "web2.local")
+	s.HttpProxy("web1", "web1")
+	s.HttpProxy("web2", "web2")
 
 	log.Fatal(s.ListenAndServe())
 }

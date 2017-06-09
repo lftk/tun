@@ -17,9 +17,9 @@ type Muxer struct {
 	listeners syncmap.Map
 }
 
-func (m *Muxer) Route(host string) net.Listener {
+func (m *Muxer) Route(domain string) net.Listener {
 	listener := proxy.NewListener()
-	actucal, _ := m.listeners.LoadOrStore(host, listener)
+	actucal, _ := m.listeners.LoadOrStore(domain, listener)
 	return actucal.(net.Listener)
 }
 
@@ -48,7 +48,7 @@ func (m *Muxer) listen(l net.Listener) {
 }
 
 func (m *Muxer) handleConn(c net.Conn) {
-	domain, cc, err := ParseConn(c)
+	domain, cc, err := SubDomain(c)
 	if err == nil {
 		val, ok := m.listeners.Load(domain)
 		if ok {
@@ -93,15 +93,15 @@ func ReadRequest(c net.Conn) (req *http.Request, cc net.Conn, err error) {
 	return
 }
 
-func ParseConn(c net.Conn) (host string, cc net.Conn, err error) {
+func SubDomain(c net.Conn) (sub string, cc net.Conn, err error) {
 	req, cc, err := ReadRequest(c)
 	if err != nil {
 		return
 	}
 
-	ss := strings.Split(req.Host, ":")
-	if len(ss) > 0 {
-		host = ss[0]
+	i := strings.Index(req.Host, ".")
+	if i != -1 {
+		sub = req.Host[:i]
 	}
 	return
 }
