@@ -5,17 +5,23 @@ import (
 )
 
 type Listener struct {
-	connc chan net.Conn
+	connc  chan net.Conn
+	closed chan interface{}
 }
 
 func NewListener() *Listener {
 	return &Listener{
-		connc: make(chan net.Conn, 16),
+		connc:  make(chan net.Conn, 16),
+		closed: make(chan interface{}),
 	}
 }
 
 func (l *Listener) Put(conn net.Conn) {
-	l.connc <- conn
+	select {
+	case <-l.closed:
+	default:
+		l.connc <- conn
+	}
 }
 
 func (l *Listener) Accept() (conn net.Conn, err error) {
@@ -33,7 +39,7 @@ func (l *Listener) Close() (err error) {
 		case conn := <-l.connc:
 			conn.Close()
 		default:
-			close(l.connc)
+			close(l.closed)
 			return
 		}
 	}

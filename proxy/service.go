@@ -81,6 +81,16 @@ func (s *Service) Proxies() (proxies []Proxy) {
 	return
 }
 
+func (s *Service) Kill(name string) (p Proxy) {
+	val, ok := s.proxies.Load(name)
+	if ok {
+		s.proxies.Delete(name)
+		p = val.(Proxy)
+		p.Close()
+	}
+	return
+}
+
 var ErrInvalidProxy = errors.New("Invalid proxy")
 
 func (s *Service) Register(name string, dialer dialer.Dialer) (err error) {
@@ -106,7 +116,9 @@ func (s *Service) listenProxy(ctx context.Context, p Proxy) {
 	for {
 		conn, err := p.Accept()
 		if err != nil {
-			s.errc <- err
+			if err != ErrClosed {
+				s.errc <- err
+			}
 			return
 		}
 

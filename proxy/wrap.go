@@ -13,17 +13,38 @@ import (
 )
 
 func Wrap(name string, l net.Listener) Proxy {
-	return &proxy{name: name, Listener: l}
+	return &proxy{
+		Listener: l,
+		name:     name,
+	}
 }
 
 type proxy struct {
 	net.Listener
 	name   string
+	closed int32
 	dialer atomic.Value
 }
 
 func (p *proxy) Name() string {
 	return p.name
+}
+
+func (p *proxy) Close() error {
+	if atomic.CompareAndSwapInt32(&p.closed, 0, 1) {
+		return p.Listener.Close()
+	}
+	return nil
+}
+
+func (p *proxy) Accept() (net.Conn, error) {
+	conn, err := p.Listener.Accept()
+	if err != nil {
+		if atomic.LoadInt32(&p.closed) == 1 {
+			err = ErrClosed
+		}
+	}
+	return conn, err
 }
 
 func (p *proxy) Bind(d dialer.Dialer) error {

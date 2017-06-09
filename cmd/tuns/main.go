@@ -36,6 +36,7 @@ func main() {
 
 	time.AfterFunc(time.Second*3, func() {
 		//cancel()
+		//s.Kill("web1")
 	})
 	log.Fatal(s.ListenAndServe(ctx))
 }

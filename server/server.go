@@ -41,10 +41,15 @@ func (s *Server) TcpProxy(name, addr string) (err error) {
 	return
 }
 
+type httpProxy struct {
+	proxy.Proxy
+	domain string
+}
+
 func (s *Server) HttpProxy(name, domain string) (err error) {
 	l := proxy.NewListener()
 	p := proxy.Wrap(name, l)
-	err = s.Proxy(p)
+	err = s.Proxy(httpProxy{p, domain})
 	if err != nil {
 		return
 	}
@@ -59,6 +64,14 @@ func (s *Server) Proxy(p proxy.Proxy) error {
 
 func (s *Server) Proxies() []proxy.Proxy {
 	return s.service.Proxies()
+}
+
+func (s *Server) Kill(name string) {
+	p := s.service.Kill(name)
+	hp, ok := p.(httpProxy)
+	if ok {
+		s.muxer.HandleFunc(hp.domain, nil)
+	}
 }
 
 func (s *Server) Traffic(traff traffic.Traffic) {
