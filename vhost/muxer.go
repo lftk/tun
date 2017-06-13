@@ -3,6 +3,7 @@ package vhost
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -12,11 +13,10 @@ import (
 )
 
 type Muxer struct {
-	connc   chan net.Conn
 	handler syncmap.Map
 }
 
-func (m *Muxer) HandleFunc(domain string, handle func(net.Conn)) {
+func (m *Muxer) HandleFunc(domain string, handle func(net.Conn) error) {
 	if handle != nil {
 		m.handler.Store(domain, handle)
 	} else {
@@ -25,9 +25,12 @@ func (m *Muxer) HandleFunc(domain string, handle func(net.Conn)) {
 }
 
 func (m *Muxer) Handle(c net.Conn) {
-	domain, cc, err := SubDomain(c)
+	fmt.Println("...Muxer...")
+
+	domain, bc, err := subDomain(c)
 	if err != nil {
 		// 500
+		fmt.Println("500")
 		c.Close()
 		return
 	}
@@ -35,20 +38,26 @@ func (m *Muxer) Handle(c net.Conn) {
 	val, ok := m.handler.Load(domain)
 	if !ok {
 		// 400
-		cc.Close()
+		fmt.Println("400")
+		bc.Close()
 		return
 	}
 
-	val.(func(net.Conn))(cc)
+	err = val.(func(net.Conn) error)(bc)
+	if err != nil {
+		// 500
+		fmt.Println("500")
+		bc.Close()
+	}
 }
 
 type bufferConn struct {
 	net.Conn
-	buf *bytes.Buffer
+	*bytes.Buffer
 }
 
 func (c bufferConn) Read(b []byte) (int, error) {
-	return io.MultiReader(c.buf, c.Conn).Read(b)
+	return io.MultiReader(c.Buffer, c.Conn).Read(b)
 }
 
 func (c bufferConn) Write(b []byte) (int, error) {
@@ -59,7 +68,7 @@ func (c bufferConn) Close() error {
 	return c.Conn.Close()
 }
 
-func ReadRequest(c net.Conn) (req *http.Request, cc net.Conn, err error) {
+func readRequest(c net.Conn) (req *http.Request, bc net.Conn, err error) {
 	buf := bytes.NewBuffer(nil)
 	tr := io.TeeReader(c, buf)
 	br := bufio.NewReader(tr)
@@ -68,15 +77,12 @@ func ReadRequest(c net.Conn) (req *http.Request, cc net.Conn, err error) {
 		return
 	}
 
-	cc = bufferConn{
-		Conn: c,
-		buf:  buf,
-	}
+	bc = bufferConn{Conn: c, Buffer: buf}
 	return
 }
 
-func SubDomain(c net.Conn) (sub string, cc net.Conn, err error) {
-	req, cc, err := ReadRequest(c)
+func subDomain(c net.Conn) (sub string, bc net.Conn, err error) {
+	req, bc, err := readRequest(c)
 	if err != nil {
 		return
 	}

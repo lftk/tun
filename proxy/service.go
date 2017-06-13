@@ -3,6 +3,7 @@ package proxy
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 
 	"github.com/4396/tun/dialer"
@@ -32,13 +33,19 @@ func (s *Service) Serve(ctx context.Context) (err error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer func() {
 		cancel()
-		for {
-			select {
-			case p := <-s.proxyc:
-				p.Close()
-			default:
-			}
-		}
+
+		// close channel
+		close(s.errc)
+		close(s.connc)
+		close(s.proxyc)
+		s.proxyc = nil
+
+		// close proxy
+		s.proxies.Range(func(key, val interface{}) bool {
+			s.proxies.Delete(key)
+			val.(Proxy).Close()
+			return true
+		})
 	}()
 
 	s.proxies.Range(func(key, val interface{}) bool {
@@ -112,7 +119,6 @@ func (s *Service) Unregister(name string, dialer dialer.Dialer) (err error) {
 }
 
 func (s *Service) listenProxy(ctx context.Context, p Proxy) {
-	defer p.Close()
 	for {
 		conn, err := p.Accept()
 		if err != nil {
@@ -137,7 +143,8 @@ func (s *Service) handleConn(ctx context.Context, pc proxyConn) {
 	default:
 		err := pc.Proxy.Handle(pc.Conn, s.Traff)
 		if err != nil {
-			// ...
+			fmt.Println(err)
+			pc.Conn.Close()
 		}
 	}
 }

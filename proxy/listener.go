@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"fmt"
 	"net"
 )
 
@@ -16,12 +17,14 @@ func NewListener() *Listener {
 	}
 }
 
-func (l *Listener) Put(conn net.Conn) {
-	select {
-	case <-l.closed:
-	default:
-		l.connc <- conn
-	}
+func (l *Listener) Put(conn net.Conn) (err error) {
+	defer func() {
+		if x := recover(); x != nil {
+			err = fmt.Errorf("%v", x)
+		}
+	}()
+	l.connc <- conn
+	return
 }
 
 func (l *Listener) Accept() (conn net.Conn, err error) {
@@ -34,13 +37,9 @@ func (l *Listener) Addr() (addr net.Addr) {
 }
 
 func (l *Listener) Close() (err error) {
-	for {
-		select {
-		case conn := <-l.connc:
-			conn.Close()
-		default:
-			close(l.closed)
-			return
-		}
+	close(l.connc)
+	for conn := range l.connc {
+		conn.Close()
 	}
+	return
 }

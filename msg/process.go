@@ -47,22 +47,31 @@ func readMsg(r io.Reader) (t byte, b []byte, err error) {
 }
 
 func Read(r io.Reader) (msg Message, err error) {
-	if t, b, err := readMsg(r); err == nil {
-		msg, err = UnPack(t, b)
+	t, b, err := readMsg(r)
+	if err != nil {
+		return
 	}
+
+	msg, err = UnPack(t, b)
 	return
 }
 
 func ReadInto(r io.Reader, msg Message) (err error) {
-	if _, b, err := readMsg(r); err == nil {
-		err = UnPackInto(b, msg)
+	_, b, err := readMsg(r)
+	if err != nil {
+		return
 	}
+
+	err = UnPackInto(b, msg)
 	return
 }
 
 func Write(w io.Writer, msg interface{}) (err error) {
-	if b, err := Pack(msg); err == nil {
-		_, err = w.Write(b)
+	b, err := Pack(msg)
+	if err != nil {
+		return
 	}
+
+	_, err = w.Write(b)
 	return
 }

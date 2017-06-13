@@ -26,10 +26,10 @@ func main() {
 	}
 	s.Traffic(new(traffic))
 
-	s.TcpProxy("tcp", ":7070")
-	s.TcpProxy("ssh", ":7071")
-	s.HttpProxy("web1", "web1")
-	s.HttpProxy("web2", "web2")
+	s.Tcp("tcp", ":7070")
+	s.Tcp("ssh", ":7071")
+	s.Http("web1", "web1")
+	s.Http("web2", "web2")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -37,6 +37,8 @@ func main() {
 	time.AfterFunc(time.Second*3, func() {
 		//cancel()
 		//s.Kill("web1")
+		//time.Sleep(time.Second * 3)
+		//s.HttpProxy("web1", "web1")
 	})
 	log.Fatal(s.ListenAndServe(ctx))
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"log"
 	"net"
@@ -48,19 +49,25 @@ func main() {
 	go webServer(":3456")
 	go tcpServer(":4567")
 
-	c, err := client.Dial(":8867")
-	if err != nil {
-		log.Fatal(err)
+	c := client.Client{
+		ServerAddr: ":8867",
+		LocalAddr:  ":3456",
+		Name:       "web1",
+		Token:      "token",
 	}
 
-	go c.Proxy("tcp", "token", ":3456")
-	go c.Proxy("ssh", "token", ":4567")
-	go c.Proxy("web1", "token", ":3456")
-	go c.Proxy("web2", "token", ":3456")
-	//go c.Proxy("ssh", "token", "")
-
+	ctx, cancel := context.WithCancel(context.Background())
 	time.AfterFunc(time.Second*3, func() {
-		//c.Shutdown()
+		_ = cancel
+		// cancel()
 	})
-	log.Fatal(c.Serve())
+
+	for {
+		err := c.DialAndServe(ctx)
+		if err == context.Canceled {
+			return
+		}
+		time.Sleep(time.Second)
+		fmt.Println("...reconnect...")
+	}
 }

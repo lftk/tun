@@ -6,19 +6,23 @@ import (
 
 type Message interface{}
 
-type Login struct {
+type Auth struct {
 	Name  string
 	Token string
+}
+
+type AuthResp struct {
+	Error string
 }
 
 type Dial struct{}
 
-type WorkConn struct {
-	Name  string
-	Token string
-}
+type WorkConn struct{}
 
 type StartWorkConn struct{}
+
+type Ping struct{}
+type Pong struct{}
 
 func typeof(v interface{}) reflect.Type {
 	return reflect.TypeOf(v).Elem()
@@ -27,10 +31,13 @@ func typeof(v interface{}) reflect.Type {
 var (
 	msgTypes = make(map[reflect.Type]byte)
 	typeMsgs = []reflect.Type{
-		typeof((*Login)(nil)),
+		typeof((*Auth)(nil)),
+		typeof((*AuthResp)(nil)),
 		typeof((*Dial)(nil)),
 		typeof((*WorkConn)(nil)),
 		typeof((*StartWorkConn)(nil)),
+		typeof((*Ping)(nil)),
+		typeof((*Pong)(nil)),
 	}
 )
 

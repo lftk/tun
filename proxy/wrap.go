@@ -6,7 +6,6 @@ import (
 	"io"
 	"net"
 	"sync"
-	"sync/atomic"
 
 	"github.com/4396/tun/dialer"
 	"github.com/4396/tun/traffic"
@@ -22,25 +21,34 @@ func Wrap(name string, l net.Listener) Proxy {
 type proxy struct {
 	net.Listener
 	name   string
-	closed int32
-	dialer atomic.Value
+	closed bool
+	mu     sync.RWMutex
+	dialer dialer.Dialer
 }
 
 func (p *proxy) Name() string {
 	return p.name
 }
 
-func (p *proxy) Close() error {
-	if atomic.CompareAndSwapInt32(&p.closed, 0, 1) {
-		return p.Listener.Close()
+func (p *proxy) Close() (err error) {
+	p.closed = true
+	err = p.Listener.Close()
+	if err != nil {
+		return
 	}
-	return nil
+
+	p.mu.RLock()
+	if p.dialer != nil {
+		err = p.dialer.Close()
+	}
+	p.mu.RUnlock()
+	return
 }
 
 func (p *proxy) Accept() (net.Conn, error) {
 	conn, err := p.Listener.Accept()
 	if err != nil {
-		if atomic.LoadInt32(&p.closed) == 1 {
+		if p.closed {
 			err = ErrClosed
 		}
 	}
@@ -48,20 +56,27 @@ func (p *proxy) Accept() (net.Conn, error) {
 }
 
 func (p *proxy) Bind(d dialer.Dialer) error {
-	p.dialer.Store(d)
+	p.mu.Lock()
+	p.dialer = d
+	p.mu.Unlock()
 	return nil
 }
 
 func (p *proxy) Unbind(d dialer.Dialer) error {
-	if p.dialer.Load().(dialer.Dialer) == d {
-		p.dialer.Store(d)
+	p.mu.Lock()
+	if p.dialer == d {
+		p.dialer = nil
 		d.Close()
 	}
+	p.mu.Unlock()
 	return nil
 }
 
 func (p *proxy) Handle(conn net.Conn, traff traffic.Traffic) (err error) {
-	dialer, _ := p.dialer.Load().(dialer.Dialer)
+	var dialer dialer.Dialer
+	p.mu.RLock()
+	dialer = p.dialer
+	p.mu.RUnlock()
 	if dialer == nil {
 		err = errors.New("Not bind dialer")
 		return
@@ -91,7 +106,7 @@ type trafficConn struct {
 func (tc trafficConn) Read(b []byte) (n int, err error) {
 	n, err = tc.Conn.Read(b)
 	if tc.Traffic != nil && n > 0 {
-		tc.Traffic.In(tc.name, b, int64(n))
+		tc.Traffic.In(tc.name, b[:n], int64(n))
 	}
 	return
 }
@@ -99,7 +114,7 @@ func (tc trafficConn) Read(b []byte) (n int, err error) {
 func (tc trafficConn) Write(b []byte) (n int, err error) {
 	n, err = tc.Conn.Write(b)
 	if tc.Traffic != nil && n > 0 {
-		tc.Traffic.Out(tc.name, b, int64(n))
+		tc.Traffic.Out(tc.name, b[:n], int64(n))
 	}
 	return
 }
@@ -119,28 +134,4 @@ func (tc trafficConn) Join(work net.Conn) {
 	go pipe(tc, work)
 	go pipe(work, tc)
 	wg.Wait()
-}
-
-func Join(dialer dialer.Dialer, conn net.Conn) (in, out int64) {
-	work, err := dialer.Dial()
-	if err != nil {
-		return
-	}
-
-	var wg sync.WaitGroup
-	pipe := func(from, to net.Conn, n *int64) {
-		defer func() {
-			from.Close()
-			to.Close()
-			wg.Done()
-		}()
-		*n, _ = io.Copy(to, from)
-		return
-	}
-
-	wg.Add(2)
-	go pipe(conn, work, &in)
-	go pipe(work, conn, &out)
-	wg.Wait()
-	return
 }
