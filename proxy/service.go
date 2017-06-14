@@ -16,7 +16,6 @@ type Service struct {
 	proxies syncmap.Map
 	proxyc  chan Proxy
 	connc   chan proxyConn
-	donec   chan interface{}
 	errc    chan error
 }
 
@@ -35,7 +34,7 @@ func (s *Service) Serve(ctx context.Context) (err error) {
 		cancel()
 
 		// close channel
-		close(s.errc)
+		//close(s.errc)
 		close(s.connc)
 		close(s.proxyc)
 		s.proxyc = nil

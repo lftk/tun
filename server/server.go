@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"time"
 
 	"github.com/4396/tun/msg"
 	"github.com/4396/tun/proxy"
@@ -116,7 +115,7 @@ func (s *Server) Serve(ctx context.Context, l, h net.Listener) (err error) {
 		h.Close()
 
 		// close channel
-		close(s.errc)
+		//close(s.errc)
 		close(s.httpConnc)
 		close(s.clientConnc)
 		close(s.agentConnc)
@@ -176,8 +175,6 @@ func (s *Server) listen(ctx context.Context, l net.Listener, connc chan<- net.Co
 }
 
 func (s *Server) handleHttpConn(ctx context.Context, c net.Conn) {
-	fmt.Println("http", c.RemoteAddr())
-
 	select {
 	case <-ctx.Done():
 	default:
@@ -185,63 +182,15 @@ func (s *Server) handleHttpConn(ctx context.Context, c net.Conn) {
 	}
 }
 
-var pong msg.Pong
-
 func (s *Server) handleClientConn(ctx context.Context, c net.Conn) {
-	fmt.Println("client", c.RemoteAddr())
-	defer fmt.Println("----------------------------")
-
 	agent, err := s.authClientConn(c)
 	if err != nil {
 		c.Close()
 		return
 	}
 
-	lastPing := time.Now()
-	go func() {
-		defer fmt.Println("..go1..")
-		for {
-			m, err := msg.Read(agent.conn)
-			if err != nil {
-				return
-			}
-
-			switch m.(type) {
-			case *msg.Ping:
-				lastPing = time.Now()
-				msg.Write(agent.conn, &pong)
-			default:
-			}
-		}
-	}()
-
-	var (
-		dura   = time.Second * 10
-		ticker = time.NewTicker(dura)
-		exitc  = make(chan interface{})
-	)
-
 	defer func() {
-		close(exitc)
-		ticker.Stop()
-	}()
-
-	go func() {
-		defer fmt.Println("..go2..")
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				if lastPing.Add(3 * dura).Before(time.Now()) {
-					s.service.Unregister(agent.name, agent)
-					return
-				}
-			case <-exitc:
-				s.service.Unregister(agent.name, agent)
-				return
-			}
-		}
+		s.service.Unregister(agent.name, agent)
 	}()
 
 	for {
@@ -260,20 +209,21 @@ func (s *Server) handleClientConn(ctx context.Context, c net.Conn) {
 }
 
 func (s *Server) handleAgentConn(ctx context.Context, ac agentConn) {
-	fmt.Println("agent", ac.agent.name)
-
 	select {
 	case <-ctx.Done():
 	default:
 		m, err := msg.Read(ac.Conn)
 		if err != nil {
+			ac.Conn.Close()
 			return
 		}
 
-		switch mm := m.(type) {
+		switch m.(type) {
 		case *msg.WorkConn:
-			fmt.Println("work", mm)
-			ac.agent.Put(ac.Conn)
+			err := ac.agent.Put(ac.Conn)
+			if err != nil {
+				ac.Conn.Close()
+			}
 		default:
 			fmt.Printf("other %+v\n", m)
 		}

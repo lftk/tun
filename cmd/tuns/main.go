@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"time"
 
@@ -12,11 +11,11 @@ import (
 type traffic struct{}
 
 func (t *traffic) In(name string, b []byte, n int64) {
-	fmt.Println("in", name, string(b[:n]), n)
+	//fmt.Println("in", name, string(b[:n]), n)
 }
 
 func (t *traffic) Out(name string, b []byte, n int64) {
-	fmt.Println("out", name, string(b[:n]), n)
+	//fmt.Println("out", name, string(b[:n]), n)
 }
 
 func main() {
@@ -32,9 +31,9 @@ func main() {
 	s.Http("web2", "web2")
 
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
-	time.AfterFunc(time.Second*3, func() {
+	time.AfterFunc(time.Second*30, func() {
+		_ = cancel
 		//cancel()
 		//s.Kill("web1")
 		//time.Sleep(time.Second * 3)

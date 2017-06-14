@@ -21,9 +21,6 @@ type WorkConn struct{}
 
 type StartWorkConn struct{}
 
-type Ping struct{}
-type Pong struct{}
-
 func typeof(v interface{}) reflect.Type {
 	return reflect.TypeOf(v).Elem()
 }
@@ -36,8 +33,6 @@ var (
 		typeof((*Dial)(nil)),
 		typeof((*WorkConn)(nil)),
 		typeof((*StartWorkConn)(nil)),
-		typeof((*Ping)(nil)),
-		typeof((*Pong)(nil)),
 	}
 )
 

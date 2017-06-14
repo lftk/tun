@@ -29,7 +29,7 @@ func (a *agent) Put(conn net.Conn) (err error) {
 
 var (
 	ErrAgentClosed  = errors.New("Agent closed")
-	ErrNoEnoughConn = errors.New("No enough conn")
+	ErrNoEnoughConn = errors.New("No enough work conn")
 )
 
 func (a *agent) dial() (conn net.Conn, err error) {

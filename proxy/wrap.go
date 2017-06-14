@@ -2,7 +2,6 @@ package proxy
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"net"
 	"sync"
@@ -92,8 +91,6 @@ func (p *proxy) Handle(conn net.Conn, traff traffic.Traffic) (err error) {
 		Conn:    conn,
 		Traffic: traff,
 	}.Join(work)
-
-	fmt.Println("Handle succ...")
 	return
 }
 

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"time"
 
 	"github.com/4396/tun/msg"
 	"github.com/4396/tun/proxy"
@@ -30,11 +29,13 @@ func (c *Client) handleWorkConn(conn net.Conn) {
 	var start msg.StartWorkConn
 	err := msg.ReadInto(conn, &start)
 	if err != nil {
+		fmt.Println("msg.StartWorkConn..", err)
 		return
 	}
 
 	err = c.listener.Put(conn)
 	if err != nil {
+		conn.Close()
 		// ...
 	}
 }
@@ -96,11 +97,9 @@ func (c *Client) Serve(ctx context.Context, conn net.Conn) (err error) {
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
-	ticker := time.NewTicker(time.Second * 10)
 	defer func() {
 		cancel()
 		c.uninit()
-		ticker.Stop()
 	}()
 
 	go c.loopMessage(ctx)
@@ -115,11 +114,6 @@ func (c *Client) Serve(ctx context.Context, conn net.Conn) (err error) {
 		select {
 		case m := <-c.msgc:
 			go c.handleMessage(ctx, m)
-		case <-ticker.C:
-			err = c.heartbeat()
-			if err != nil {
-				return
-			}
 		case err = <-c.errc:
 			return
 		case <-ctx.Done():
@@ -127,19 +121,6 @@ func (c *Client) Serve(ctx context.Context, conn net.Conn) (err error) {
 			return
 		}
 	}
-}
-
-func (c *Client) heartbeat() (err error) {
-	for i := 0; i < 3; i++ {
-		err = msg.Write(c.conn, &msg.Ping{})
-		if err == nil {
-			break
-		}
-		if i != 2 {
-			time.Sleep(time.Millisecond * 10)
-		}
-	}
-	return
 }
 
 func (c *Client) loopMessage(ctx context.Context) {
@@ -165,13 +146,13 @@ func (c *Client) handleMessage(ctx context.Context, m msg.Message) {
 	default:
 		switch m.(type) {
 		case *msg.Dial:
-			fmt.Println("...dial...")
 			st, err := c.sess.OpenStream()
 			if err != nil {
 				return
 			}
 			err = msg.Write(st, &msg.WorkConn{})
 			if err != nil {
+				st.Close()
 				return
 			}
 			go c.handleWorkConn(st)

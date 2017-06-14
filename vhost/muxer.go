@@ -25,12 +25,10 @@ func (m *Muxer) HandleFunc(domain string, handle func(net.Conn) error) {
 }
 
 func (m *Muxer) Handle(c net.Conn) {
-	fmt.Println("...Muxer...")
-
 	domain, bc, err := subDomain(c)
 	if err != nil {
 		// 500
-		fmt.Println("500")
+		fmt.Println("1-500", err)
 		c.Close()
 		return
 	}
@@ -43,10 +41,13 @@ func (m *Muxer) Handle(c net.Conn) {
 		return
 	}
 
+	//bc.Close()
+	//return
+
 	err = val.(func(net.Conn) error)(bc)
 	if err != nil {
 		// 500
-		fmt.Println("500")
+		fmt.Println("2-500", err)
 		bc.Close()
 	}
 }
