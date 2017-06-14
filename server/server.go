@@ -112,12 +112,6 @@ func (s *Server) Serve(ctx context.Context, l, h net.Listener) (err error) {
 	defer func() {
 		cancel()
 
-		// close listener
-		l.Close()
-		h.Close()
-
-		// close channel
-		//close(s.errc)
 		close(s.httpConnc)
 		close(s.clientConnc)
 		close(s.agentConnc)
@@ -140,7 +134,10 @@ func (s *Server) Serve(ctx context.Context, l, h net.Listener) (err error) {
 	}
 
 	go func() {
-		s.errc <- s.service.Serve(ctx)
+		err := s.service.Serve(ctx)
+		if err != nil {
+			s.errc <- err
+		}
 	}()
 
 	for {
@@ -160,6 +157,7 @@ func (s *Server) Serve(ctx context.Context, l, h net.Listener) (err error) {
 }
 
 func (s *Server) listen(ctx context.Context, l net.Listener, connc chan<- net.Conn) {
+	defer l.Close()
 	for {
 		conn, err := l.Accept()
 		if err != nil {
