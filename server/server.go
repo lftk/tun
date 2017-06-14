@@ -16,6 +16,8 @@ type Server struct {
 	Addr     string
 	HttpAddr string
 
+	Auth func(name, token string) error
+
 	muxer   vhost.Muxer
 	service proxy.Service
 
@@ -241,22 +243,26 @@ func (s *Server) authClientConn(conn net.Conn) (a *agent, err error) {
 		return
 	}
 
-	var m msg.Auth
-	err = msg.ReadInto(st, &m)
+	var auth msg.Auth
+	err = msg.ReadInto(st, &auth)
 	if err != nil {
 		return
 	}
 
-	// auth client
-	// ...
+	if s.Auth != nil {
+		err = s.Auth(auth.Name, auth.Token)
+		if err != nil {
+			return
+		}
+	}
 
 	a = &agent{
-		name:  m.Name,
+		name:  auth.Name,
 		sess:  sess,
 		conn:  st,
 		connc: make(chan net.Conn, 16),
 	}
-	err = s.service.Register(m.Name, a)
+	err = s.service.Register(auth.Name, a)
 	if err != nil {
 		msg.Write(st, &msg.AuthResp{
 			Error: err.Error(),
