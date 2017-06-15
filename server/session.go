@@ -20,19 +20,16 @@ type streamMessage struct {
 }
 
 func (s session) loopMessage(ctx context.Context) {
-	var (
-		cancel context.CancelFunc
-		stmc   = make(chan streamMessage, 16)
-	)
-
-	s.agent = make(map[string]*agent)
 	sess, err := smux.Server(s.Conn, nil)
 	if err != nil {
 		s.Conn.Close()
 		return
 	}
 
-	ctx, cancel = context.WithCancel(ctx)
+	s.agent = make(map[string]*agent)
+	stmc := make(chan streamMessage, 16)
+
+	ctx, cancel := context.WithCancel(ctx)
 	defer func() {
 		cancel()
 		close(stmc)
@@ -66,7 +63,6 @@ func (s session) loopMessage(ctx context.Context) {
 }
 
 func (s *session) processMessage(ctx context.Context, stmc <-chan streamMessage) {
-	var err error
 	for stm := range stmc {
 		select {
 		case <-ctx.Done():
@@ -74,6 +70,7 @@ func (s *session) processMessage(ctx context.Context, stmc <-chan streamMessage)
 		default:
 		}
 
+		var err error
 		switch m := stm.Message.(type) {
 		case *msg.Proxy:
 			err = s.proxy(stm.Stream, m)
@@ -84,7 +81,6 @@ func (s *session) processMessage(ctx context.Context, stmc <-chan streamMessage)
 		default:
 			stm.Stream.Close()
 		}
-
 		if err != nil {
 			stm.Stream.Close()
 		}
@@ -103,7 +99,6 @@ func (s *session) proxy(conn net.Conn, proxy *msg.Proxy) (err error) {
 	}
 
 	a := &agent{
-		name:  proxy.Name,
 		conn:  conn,
 		connc: make(chan net.Conn, 16),
 	}

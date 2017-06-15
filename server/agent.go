@@ -10,7 +10,6 @@ import (
 )
 
 type agent struct {
-	name  string
 	conn  net.Conn
 	connc chan net.Conn
 }
