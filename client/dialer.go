@@ -4,18 +4,14 @@ import (
 	"net"
 )
 
-type Dialer struct {
-	addr string
+type dialer struct {
+	Addr string
 }
 
-func NewDialer(addr string) *Dialer {
-	return &Dialer{addr: addr}
+func (d *dialer) Dial() (net.Conn, error) {
+	return net.Dial("tcp", d.Addr)
 }
 
-func (d *Dialer) Dial() (net.Conn, error) {
-	return net.Dial("tcp", d.addr)
-}
-
-func (d *Dialer) Close() error {
+func (d *dialer) Close() error {
 	return nil
 }

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/4396/tun/client"
+	"github.com/4396/tun/mux"
 )
 
 func webServer(addr string) {
@@ -49,11 +50,18 @@ func main() {
 	go webServer(":3456")
 	go tcpServer(":4567")
 
+	dialer, err := mux.Dial(":8867")
+	if err != nil {
+		return
+	}
+
 	c := client.Client{
-		ServerAddr: ":8867",
-		LocalAddr:  ":3456",
-		Name:       "web1",
-		Token:      "token",
+		Dialer: dialer,
+	}
+
+	err = c.Proxy("web1", "token", ":3456")
+	if err != nil {
+		return
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -62,12 +70,5 @@ func main() {
 		// cancel()
 	})
 
-	for {
-		err := c.DialAndServe(ctx)
-		if err == context.Canceled {
-			return
-		}
-		time.Sleep(time.Second)
-		fmt.Println("...reconnect...")
-	}
+	log.Fatal(c.Serve(ctx))
 }

@@ -2,107 +2,77 @@ package client
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"net"
 
 	"github.com/4396/tun/msg"
+	"github.com/4396/tun/mux"
 	"github.com/4396/tun/proxy"
-	"github.com/xtaci/smux"
+	"github.com/golang/sync/syncmap"
 )
 
 type Client struct {
-	ServerAddr string
-	LocalAddr  string
-	Name       string
-	Token      string
+	Dialer *mux.Dialer
 
-	service  proxy.Service
-	listener *proxy.Listener
-	sess     *smux.Session
-	conn     *smux.Stream
-	errc     chan error
-	msgc     chan msg.Message
+	proxys  syncmap.Map
+	proxyc  chan *Proxy
+	service proxy.Service
+	errc    chan error
 }
 
-func (c *Client) handleWorkConn(conn net.Conn) {
-	var resp msg.StartWork
-	err := msg.ReadInto(conn, &resp)
+func (c *Client) Proxy(name, token, addr string) (err error) {
+	conn, err := c.Dialer.Dial()
 	if err != nil {
-		fmt.Println("msg.StartWorkConn..", err)
 		return
 	}
 
-	err = c.listener.Put(conn)
+	err = msg.Write(conn, &msg.Proxy{
+		Name:  name,
+		Token: token,
+	})
 	if err != nil {
 		conn.Close()
-		// ...
-	}
-}
-
-func (c *Client) DialAndServe(ctx context.Context) (err error) {
-	conn, err := net.Dial("tcp", c.ServerAddr)
-	if err != nil {
-		return
-	}
-	err = c.Serve(ctx, conn)
-	return
-}
-
-func (c *Client) init(conn net.Conn) (err error) {
-	sess, err := smux.Client(conn, smux.DefaultConfig())
-	if err != nil {
 		return
 	}
 
-	st, err := sess.OpenStream()
+	err = msg.Okay(conn)
 	if err != nil {
-		sess.Close()
-		return
-	}
-
-	err = auth(st, c.Name, c.Token)
-	if err != nil {
-		st.Close()
-		sess.Close()
+		conn.Close()
 		return
 	}
 
 	l := proxy.NewListener()
-	p := proxy.Wrap(c.Name, l)
-	p.Bind(NewDialer(c.LocalAddr))
-	c.service.Proxy(p)
-
-	c.conn = st
-	c.sess = sess
-	c.listener = l
-	c.errc = make(chan error, 1)
-	c.msgc = make(chan msg.Message, 16)
-	return
-}
-
-func (c *Client) uninit() {
-	c.conn.Close()
-	c.sess.Close()
-
-	// close channel
-	close(c.errc)
-	close(c.msgc)
-}
-
-func (c *Client) Serve(ctx context.Context, conn net.Conn) (err error) {
-	err = c.init(conn)
+	p := proxy.Wrap(name, l)
+	p.Bind(&dialer{addr})
+	err = c.service.Proxy(p)
 	if err != nil {
 		return
 	}
 
+	pp := &Proxy{
+		Client:   c,
+		Name:     name,
+		Conn:     conn,
+		Listener: l,
+	}
+	c.proxys.Store(name, pp)
+	if c.proxyc != nil {
+		c.proxyc <- pp
+	}
+	return
+}
+
+func (c *Client) Serve(ctx context.Context) (err error) {
+	c.errc = make(chan error, 1)
+	c.proxyc = make(chan *Proxy, 16)
 	ctx, cancel := context.WithCancel(ctx)
 	defer func() {
 		cancel()
-		c.uninit()
 	}()
 
-	go c.loopMessage(ctx)
+	c.proxys.Range(func(key, val interface{}) bool {
+		go val.(*Proxy).loopMessage(ctx)
+		return true
+	})
+
 	go func() {
 		err := c.service.Serve(ctx)
 		if err != nil {
@@ -112,8 +82,8 @@ func (c *Client) Serve(ctx context.Context, conn net.Conn) (err error) {
 
 	for {
 		select {
-		case m := <-c.msgc:
-			go c.handleMessage(ctx, m)
+		case p := <-c.proxyc:
+			go p.loopMessage(ctx)
 		case err = <-c.errc:
 			return
 		case <-ctx.Done():
@@ -121,68 +91,4 @@ func (c *Client) Serve(ctx context.Context, conn net.Conn) (err error) {
 			return
 		}
 	}
-}
-
-func (c *Client) loopMessage(ctx context.Context) {
-	for {
-		m, err := msg.Read(c.conn)
-		if err != nil {
-			c.errc <- err
-			return
-		}
-
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			c.msgc <- m
-		}
-	}
-}
-
-func (c *Client) handleMessage(ctx context.Context, m msg.Message) {
-	select {
-	case <-ctx.Done():
-	default:
-		switch m.(type) {
-		case *msg.Dial:
-			st, err := c.sess.OpenStream()
-			if err != nil {
-				return
-			}
-			err = msg.Write(st, &msg.Worker{
-				Name: c.Name,
-			})
-			if err != nil {
-				st.Close()
-				return
-			}
-			go c.handleWorkConn(st)
-		default:
-		}
-	}
-}
-
-func auth(conn net.Conn, name, token string) (err error) {
-	err = msg.Write(conn, &msg.Proxy{
-		Name:  name,
-		Token: token,
-	})
-	if err != nil {
-		return
-	}
-
-	m, err := msg.Read(conn)
-	if err != nil {
-		return
-	}
-
-	switch mm := m.(type) {
-	case *msg.OK:
-	case *msg.Error:
-		err = errors.New(mm.Message)
-	default:
-		err = errors.New("Unexpected error")
-	}
-	return
 }

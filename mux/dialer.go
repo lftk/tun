@@ -6,7 +6,12 @@ import (
 	"github.com/xtaci/smux"
 )
 
-func Dial(conn net.Conn) (d *Dialer, err error) {
+func Dial(addr string) (d *Dialer, err error) {
+	conn, err := net.Dial("tcp", addr)
+	if err != nil {
+		return
+	}
+
 	sess, err := smux.Client(conn, nil)
 	if err != nil {
 		return
