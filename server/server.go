@@ -2,37 +2,28 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"net"
 
-	"github.com/4396/tun/msg"
 	"github.com/4396/tun/proxy"
 	"github.com/4396/tun/traffic"
 	"github.com/4396/tun/vhost"
-	"github.com/xtaci/smux"
 )
 
 type Server struct {
 	Addr     string
 	HttpAddr string
 
-	Auth func(name, token string) error
+	Admin Administrator
 
 	muxer   vhost.Muxer
 	service proxy.Service
 
-	errc        chan error
-	httpConnc   chan net.Conn
-	clientConnc chan net.Conn
-	agentConnc  chan agentConn
+	errc      chan error
+	connc     chan net.Conn
+	httpConnc chan net.Conn
 }
 
-type agentConn struct {
-	*agent
-	net.Conn
-}
-
-func (s *Server) Tcp(name, addr string) (err error) {
+func (s *Server) ProxyTCP(name, addr string) (err error) {
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
 		return
@@ -51,7 +42,7 @@ type httpProxy struct {
 	domain string
 }
 
-func (s *Server) Http(name, domain string) (err error) {
+func (s *Server) ProxyHTTP(name, domain string) (err error) {
 	l := proxy.NewListener()
 	p := proxy.Wrap(name, l)
 	err = s.Proxy(httpProxy{p, domain})
@@ -104,31 +95,26 @@ func (s *Server) ListenAndServe(ctx context.Context) (err error) {
 
 func (s *Server) Serve(ctx context.Context, l, h net.Listener) (err error) {
 	s.errc = make(chan error, 1)
+	s.connc = make(chan net.Conn, 16)
 	s.httpConnc = make(chan net.Conn, 16)
-	s.clientConnc = make(chan net.Conn, 16)
-	s.agentConnc = make(chan agentConn, 16)
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer func() {
 		cancel()
 
+		close(s.connc)
 		close(s.httpConnc)
-		close(s.clientConnc)
-		close(s.agentConnc)
 
 		// close conn
 		for conn := range s.httpConnc {
 			conn.Close()
 		}
-		for conn := range s.clientConnc {
+		for conn := range s.connc {
 			conn.Close()
-		}
-		for ac := range s.agentConnc {
-			ac.Conn.Close()
 		}
 	}()
 
-	go s.listen(ctx, l, s.clientConnc)
+	go s.listen(ctx, l, s.connc)
 	if h != nil {
 		go s.listen(ctx, h, s.httpConnc)
 	}
@@ -142,12 +128,10 @@ func (s *Server) Serve(ctx context.Context, l, h net.Listener) (err error) {
 
 	for {
 		select {
+		case c := <-s.connc:
+			go s.handleConn(ctx, c)
 		case c := <-s.httpConnc:
 			go s.handleHttpConn(ctx, c)
-		case c := <-s.clientConnc:
-			go s.handleClientConn(ctx, c)
-		case c := <-s.agentConnc:
-			go s.handleAgentConn(ctx, c)
 		case err = <-s.errc:
 			return
 		case <-ctx.Done():
@@ -174,100 +158,14 @@ func (s *Server) listen(ctx context.Context, l net.Listener, connc chan<- net.Co
 	}
 }
 
+func (s *Server) handleConn(ctx context.Context, c net.Conn) {
+	session{Server: s, Conn: c}.loopMessage(ctx)
+}
+
 func (s *Server) handleHttpConn(ctx context.Context, c net.Conn) {
 	select {
 	case <-ctx.Done():
 	default:
 		s.muxer.Handle(c)
 	}
-}
-
-func (s *Server) handleClientConn(ctx context.Context, c net.Conn) {
-	agent, err := s.authClientConn(c)
-	if err != nil {
-		c.Close()
-		return
-	}
-
-	defer func() {
-		s.service.Unregister(agent.name, agent)
-	}()
-
-	for {
-		st, err := agent.sess.AcceptStream()
-		if err != nil {
-			return
-		}
-
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			s.agentConnc <- agentConn{agent, st}
-		}
-	}
-}
-
-func (s *Server) handleAgentConn(ctx context.Context, ac agentConn) {
-	select {
-	case <-ctx.Done():
-	default:
-		m, err := msg.Read(ac.Conn)
-		if err != nil {
-			ac.Conn.Close()
-			return
-		}
-
-		switch m.(type) {
-		case *msg.WorkConn:
-			err := ac.agent.Put(ac.Conn)
-			if err != nil {
-				ac.Conn.Close()
-			}
-		default:
-			fmt.Printf("other %+v\n", m)
-		}
-	}
-}
-
-func (s *Server) authClientConn(conn net.Conn) (a *agent, err error) {
-	sess, err := smux.Server(conn, smux.DefaultConfig())
-	if err != nil {
-		return
-	}
-
-	st, err := sess.AcceptStream()
-	if err != nil {
-		return
-	}
-
-	var auth msg.Auth
-	err = msg.ReadInto(st, &auth)
-	if err != nil {
-		return
-	}
-
-	if s.Auth != nil {
-		err = s.Auth(auth.Name, auth.Token)
-		if err != nil {
-			return
-		}
-	}
-
-	a = &agent{
-		name:  auth.Name,
-		sess:  sess,
-		conn:  st,
-		connc: make(chan net.Conn, 16),
-	}
-	err = s.service.Register(auth.Name, a)
-	if err != nil {
-		msg.Write(st, &msg.AuthResp{
-			Error: err.Error(),
-		})
-		return
-	}
-
-	err = msg.Write(st, &msg.AuthResp{})
-	return
 }

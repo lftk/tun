@@ -26,8 +26,8 @@ type Client struct {
 }
 
 func (c *Client) handleWorkConn(conn net.Conn) {
-	var start msg.StartWorkConn
-	err := msg.ReadInto(conn, &start)
+	var resp msg.StartWork
+	err := msg.ReadInto(conn, &resp)
 	if err != nil {
 		fmt.Println("msg.StartWorkConn..", err)
 		return
@@ -150,7 +150,9 @@ func (c *Client) handleMessage(ctx context.Context, m msg.Message) {
 			if err != nil {
 				return
 			}
-			err = msg.Write(st, &msg.WorkConn{})
+			err = msg.Write(st, &msg.Worker{
+				Name: c.Name,
+			})
 			if err != nil {
 				st.Close()
 				return
@@ -162,7 +164,7 @@ func (c *Client) handleMessage(ctx context.Context, m msg.Message) {
 }
 
 func auth(conn net.Conn, name, token string) (err error) {
-	err = msg.Write(conn, &msg.Auth{
+	err = msg.Write(conn, &msg.Proxy{
 		Name:  name,
 		Token: token,
 	})
@@ -170,7 +172,7 @@ func auth(conn net.Conn, name, token string) (err error) {
 		return
 	}
 
-	var resp msg.AuthResp
+	var resp msg.ProxyResp
 	err = msg.ReadInto(conn, &resp)
 	if err != nil {
 		return

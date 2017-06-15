@@ -18,17 +18,33 @@ func (t *traffic) Out(name string, b []byte, n int64) {
 	//fmt.Println("out", name, string(b[:n]), n)
 }
 
+type admin struct{}
+
+func (a *admin) AuthProxy(name, token string) error {
+	return nil
+}
+
+func (a *admin) AuthCmder(token string) error {
+	return nil
+}
+
+func (a *admin) Command(b []byte) ([]byte, error) {
+	return nil, nil
+}
+
 func main() {
 	s := server.Server{
 		Addr:     ":8867",
 		HttpAddr: ":8082",
+		Admin:    new(admin),
 	}
+
 	s.Traffic(new(traffic))
 
-	s.Tcp("tcp", ":7070")
-	s.Tcp("ssh", ":7071")
-	s.Http("web1", "web1")
-	s.Http("web2", "web2")
+	s.ProxyTCP("tcp", ":7070")
+	s.ProxyTCP("ssh", ":7071")
+	s.ProxyHTTP("web1", "web1")
+	s.ProxyHTTP("web2", "web2")
 
 	ctx, cancel := context.WithCancel(context.Background())
 

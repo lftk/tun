@@ -7,13 +7,11 @@ import (
 	"time"
 
 	"github.com/4396/tun/msg"
-	"github.com/xtaci/smux"
 )
 
 type agent struct {
 	name  string
-	sess  *smux.Session
-	conn  *smux.Stream
+	conn  net.Conn
 	connc chan net.Conn
 }
 
@@ -66,21 +64,16 @@ func (a *agent) Dial() (conn net.Conn, err error) {
 		return
 	}
 
-	err = msg.Write(conn, &msg.StartWorkConn{})
+	err = msg.Write(conn, &msg.StartWork{})
 	return
 }
 
 func (a *agent) Close() (err error) {
 	fmt.Println("...close...")
 
-	// close channel
-	close(a.connc)
-
-	// close conn and sess
 	a.conn.Close()
-	a.sess.Close()
 
-	// close conn
+	close(a.connc)
 	for conn := range a.connc {
 		conn.Close()
 	}
