@@ -172,14 +172,17 @@ func auth(conn net.Conn, name, token string) (err error) {
 		return
 	}
 
-	var resp msg.ProxyResp
-	err = msg.ReadInto(conn, &resp)
+	m, err := msg.Read(conn)
 	if err != nil {
 		return
 	}
 
-	if resp.Error != "" {
-		err = errors.New(resp.Error)
+	switch mm := m.(type) {
+	case *msg.OK:
+	case *msg.Error:
+		err = errors.New(mm.Message)
+	default:
+		err = errors.New("Unexpected error")
 	}
 	return
 }

@@ -129,9 +129,9 @@ func (s *Server) Serve(ctx context.Context, l, h net.Listener) (err error) {
 	for {
 		select {
 		case c := <-s.connc:
-			s.handleConn(ctx, c)
+			go s.handleConn(ctx, c)
 		case c := <-s.httpConnc:
-			s.handleHttpConn(ctx, c)
+			go s.handleHttpConn(ctx, c)
 		case err = <-s.errc:
 			return
 		case <-ctx.Done():
@@ -159,17 +159,17 @@ func (s *Server) listen(ctx context.Context, l net.Listener, connc chan<- net.Co
 }
 
 func (s *Server) handleConn(ctx context.Context, c net.Conn) {
-	go func() {
+	select {
+	case <-ctx.Done():
+	default:
 		session{Server: s, Conn: c}.loopMessage(ctx)
-	}()
+	}
 }
 
 func (s *Server) handleHttpConn(ctx context.Context, c net.Conn) {
-	go func() {
-		select {
-		case <-ctx.Done():
-		default:
-			s.muxer.Handle(c)
-		}
-	}()
+	select {
+	case <-ctx.Done():
+	default:
+		s.muxer.Handle(c)
+	}
 }

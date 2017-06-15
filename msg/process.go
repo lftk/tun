@@ -75,3 +75,13 @@ func Write(w io.Writer, msg interface{}) (err error) {
 	_, err = w.Write(b)
 	return
 }
+
+func ReplyError(w io.Writer, msg string) error {
+	return Write(w, &Error{msg})
+}
+
+var ok OK
+
+func ReplyOK(w io.Writer) error {
+	return Write(w, &ok)
+}

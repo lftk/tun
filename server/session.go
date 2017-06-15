@@ -91,9 +91,7 @@ func (s *session) proxy(conn net.Conn, proxy *msg.Proxy) (err error) {
 	if s.Server.Admin != nil {
 		err = s.Server.Admin.AuthProxy(proxy.Name, proxy.Token)
 		if err != nil {
-			msg.Write(conn, &msg.ProxyResp{
-				Error: err.Error(),
-			})
+			msg.ReplyError(conn, err.Error())
 			return
 		}
 	}
@@ -104,13 +102,11 @@ func (s *session) proxy(conn net.Conn, proxy *msg.Proxy) (err error) {
 	}
 	err = s.Server.service.Register(proxy.Name, a)
 	if err != nil {
-		msg.Write(conn, &msg.ProxyResp{
-			Error: err.Error(),
-		})
+		msg.ReplyError(conn, err.Error())
 		return
 	}
 
-	err = msg.Write(conn, &msg.ProxyResp{})
+	err = msg.ReplyOK(conn)
 	if err != nil {
 		return
 	}
@@ -120,6 +116,49 @@ func (s *session) proxy(conn net.Conn, proxy *msg.Proxy) (err error) {
 }
 
 func (s *session) cmder(conn net.Conn, cmder *msg.Cmder) (err error) {
+	if s.Server.Admin == nil {
+		// err = ...
+		msg.ReplyError(conn, "")
+		return
+	}
+
+	err = s.Server.Admin.AuthCmder(cmder.Token)
+	if err != nil {
+		msg.ReplyError(conn, err.Error())
+		return
+	}
+
+	err = msg.ReplyOK(conn)
+	if err != nil {
+		return
+	}
+
+	go func() {
+		defer conn.Close()
+		for {
+			var (
+				cmd  msg.Command
+				resp msg.CommandResp
+			)
+
+			err := msg.ReadInto(conn, &cmd)
+			if err != nil {
+				return
+			}
+
+			data, err := s.Server.Admin.Command(cmd.Data)
+			if err != nil {
+				resp.Error = err.Error()
+			} else {
+				resp.Data = data
+			}
+
+			err = msg.Write(conn, &resp)
+			if err != nil {
+				return
+			}
+		}
+	}()
 	return
 }
 
