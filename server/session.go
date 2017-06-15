@@ -5,7 +5,7 @@ import (
 	"net"
 
 	"github.com/4396/tun/msg"
-	"github.com/xtaci/smux"
+	"github.com/4396/tun/mux"
 )
 
 type session struct {
@@ -14,41 +14,41 @@ type session struct {
 	agent map[string]*agent
 }
 
-type streamMessage struct {
-	*smux.Stream
+type message struct {
+	net.Conn
 	msg.Message
 }
 
 func (s session) loopMessage(ctx context.Context) {
-	sess, err := smux.Server(s.Conn, nil)
+	l, err := mux.Listen(s.Conn)
 	if err != nil {
 		s.Conn.Close()
 		return
 	}
 
+	msgc := make(chan message, 16)
 	s.agent = make(map[string]*agent)
-	stmc := make(chan streamMessage, 16)
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer func() {
 		cancel()
-		close(stmc)
-		sess.Close()
+		l.Close()
+		close(msgc)
 
 		for name, a := range s.agent {
 			s.Server.service.Unregister(name, a)
 		}
 	}()
 
-	go s.processMessage(ctx, stmc)
+	go s.processMessage(ctx, msgc)
 
 	for {
-		st, err := sess.AcceptStream()
+		conn, err := l.Accept()
 		if err != nil {
 			return
 		}
 
-		m, err := msg.Read(st)
+		m, err := msg.Read(conn)
 		if err != nil {
 			return
 		}
@@ -57,13 +57,13 @@ func (s session) loopMessage(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		default:
-			stmc <- streamMessage{st, m}
+			msgc <- message{conn, m}
 		}
 	}
 }
 
-func (s *session) processMessage(ctx context.Context, stmc <-chan streamMessage) {
-	for stm := range stmc {
+func (s *session) processMessage(ctx context.Context, msgc <-chan message) {
+	for m := range msgc {
 		select {
 		case <-ctx.Done():
 			return
@@ -71,18 +71,18 @@ func (s *session) processMessage(ctx context.Context, stmc <-chan streamMessage)
 		}
 
 		var err error
-		switch m := stm.Message.(type) {
+		switch msg := m.Message.(type) {
 		case *msg.Proxy:
-			err = s.proxy(stm.Stream, m)
+			err = s.proxy(m.Conn, msg)
 		case *msg.Worker:
-			err = s.worker(stm.Stream, m)
+			err = s.worker(m.Conn, msg)
 		case *msg.Cmder:
-			err = s.cmder(stm.Stream, m)
+			err = s.cmder(m.Conn, msg)
 		default:
-			stm.Stream.Close()
+			m.Conn.Close()
 		}
 		if err != nil {
-			stm.Stream.Close()
+			m.Conn.Close()
 		}
 	}
 }
