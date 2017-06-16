@@ -9,6 +9,7 @@ type Message interface{}
 type Proxy struct {
 	Name  string
 	Token string
+	Desc  string
 }
 
 type ProxyResp struct {

@@ -5,46 +5,57 @@ import (
 	"log"
 	"time"
 
+	"github.com/4396/tun/cmd"
 	"github.com/4396/tun/server"
 )
 
-type traffic struct{}
+type tunServer struct {
+	*server.Server
+}
 
-func (t *traffic) In(name string, b []byte, n int64) {
+func newTunServer(addr, httpAddr string) (s *tunServer) {
+	s = new(tunServer)
+	s.Server = &server.Server{
+		Addr:     addr,
+		HttpAddr: httpAddr,
+		Auth:     s.AuthProxy,
+	}
+	s.Traffic(s)
+	return
+}
+
+func (s *tunServer) AuthProxy(name, token, desc string) (err error) {
+	var p cmd.Proxy
+	err = cmd.Decode(desc, &p)
+	if err != nil {
+		return
+	}
+
+	for _, p := range s.Server.Proxies() {
+		if p.Name() == name {
+			return
+		}
+	}
+
+	switch p.Type {
+	case cmd.TCP:
+		err = s.Server.ProxyTCP(name, p.Port)
+	case cmd.HTTP:
+		err = s.Server.ProxyHTTP(name, p.Domain)
+	}
+	return
+}
+
+func (s *tunServer) In(name string, b []byte, n int64) {
 	//fmt.Println("in", name, string(b[:n]), n)
 }
 
-func (t *traffic) Out(name string, b []byte, n int64) {
+func (s *tunServer) Out(name string, b []byte, n int64) {
 	//fmt.Println("out", name, string(b[:n]), n)
 }
 
-type admin struct{}
-
-func (a *admin) AuthProxy(name, token string) error {
-	return nil
-}
-
-func (a *admin) AuthCmder(token string) error {
-	return nil
-}
-
-func (a *admin) Command(b []byte) ([]byte, error) {
-	return nil, nil
-}
-
 func main() {
-	s := server.Server{
-		Addr:     ":8867",
-		HttpAddr: ":8082",
-		Admin:    new(admin),
-	}
-
-	s.Traffic(new(traffic))
-
-	s.ProxyTCP("tcp", ":7070")
-	s.ProxyTCP("ssh", ":7071")
-	s.ProxyHTTP("web1", "web1")
-	s.ProxyHTTP("web2", "web2")
+	s := newTunServer(":7000", ":7070")
 
 	ctx, cancel := context.WithCancel(context.Background())
 

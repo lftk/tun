@@ -18,7 +18,7 @@ type Client struct {
 	errc    chan error
 }
 
-func (c *Client) Proxy(name, token, addr string) (err error) {
+func (c *Client) Proxy(name, token, desc, addr string) (err error) {
 	conn, err := c.Dialer.Dial()
 	if err != nil {
 		return
@@ -27,6 +27,7 @@ func (c *Client) Proxy(name, token, addr string) (err error) {
 	err = msg.Write(conn, &msg.Proxy{
 		Name:  name,
 		Token: token,
+		Desc:  desc,
 	})
 	if err != nil {
 		conn.Close()

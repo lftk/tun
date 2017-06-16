@@ -13,7 +13,7 @@ type Server struct {
 	Addr     string
 	HttpAddr string
 
-	Admin Administrator
+	Auth func(name, token, desc string) error
 
 	muxer   vhost.Muxer
 	service proxy.Service

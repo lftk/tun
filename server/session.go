@@ -73,11 +73,9 @@ func (s *session) processMessage(ctx context.Context, msgc <-chan message) {
 		var err error
 		switch msg := m.Message.(type) {
 		case *msg.Proxy:
-			err = s.proxy(m.Conn, msg)
+			err = s.processProxy(m.Conn, msg)
 		case *msg.Worker:
-			err = s.worker(m.Conn, msg)
-		case *msg.Cmder:
-			err = s.cmder(m.Conn, msg)
+			err = s.processWorker(m.Conn, msg)
 		default:
 			m.Conn.Close()
 		}
@@ -87,9 +85,9 @@ func (s *session) processMessage(ctx context.Context, msgc <-chan message) {
 	}
 }
 
-func (s *session) proxy(conn net.Conn, proxy *msg.Proxy) (err error) {
-	if s.Server.Admin != nil {
-		err = s.Server.Admin.AuthProxy(proxy.Name, proxy.Token)
+func (s *session) processProxy(conn net.Conn, proxy *msg.Proxy) (err error) {
+	if s.Server.Auth != nil {
+		err = s.Server.Auth(proxy.Name, proxy.Token, proxy.Desc)
 		if err != nil {
 			msg.ReplyError(conn, err.Error())
 			return
@@ -115,54 +113,7 @@ func (s *session) proxy(conn net.Conn, proxy *msg.Proxy) (err error) {
 	return
 }
 
-func (s *session) cmder(conn net.Conn, cmder *msg.Cmder) (err error) {
-	if s.Server.Admin == nil {
-		// err = ...
-		msg.ReplyError(conn, "")
-		return
-	}
-
-	err = s.Server.Admin.AuthCmder(cmder.Token)
-	if err != nil {
-		msg.ReplyError(conn, err.Error())
-		return
-	}
-
-	err = msg.ReplyOK(conn)
-	if err != nil {
-		return
-	}
-
-	go func() {
-		defer conn.Close()
-		for {
-			var (
-				cmd  msg.Command
-				resp msg.CommandResp
-			)
-
-			err := msg.ReadInto(conn, &cmd)
-			if err != nil {
-				return
-			}
-
-			data, err := s.Server.Admin.Command(cmd.Data)
-			if err != nil {
-				resp.Error = err.Error()
-			} else {
-				resp.Data = data
-			}
-
-			err = msg.Write(conn, &resp)
-			if err != nil {
-				return
-			}
-		}
-	}()
-	return
-}
-
-func (s *session) worker(conn net.Conn, worker *msg.Worker) (err error) {
+func (s *session) processWorker(conn net.Conn, worker *msg.Worker) (err error) {
 	a, ok := s.agent[worker.Name]
 	if !ok {
 		// ...
