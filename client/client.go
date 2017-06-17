@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 
+	"github.com/4396/tun/conn"
 	"github.com/4396/tun/msg"
 	"github.com/4396/tun/mux"
 	"github.com/4396/tun/proxy"
@@ -12,35 +13,35 @@ import (
 type Client struct {
 	Dialer *mux.Dialer
 
-	proxys  syncmap.Map
-	proxyc  chan *Proxy
-	service proxy.Service
-	errc    chan error
+	handlers syncmap.Map
+	handlerc chan *handler
+	service  proxy.Service
+	errc     chan error
 }
 
 func (c *Client) Proxy(name, token, desc, addr string) (err error) {
-	conn, err := c.Dialer.Dial()
+	cc, err := c.Dialer.Dial()
 	if err != nil {
 		return
 	}
 
-	err = msg.Write(conn, &msg.Proxy{
+	err = msg.Write(cc, &msg.Proxy{
 		Name:  name,
 		Token: token,
 		Desc:  desc,
 	})
 	if err != nil {
-		conn.Close()
+		cc.Close()
 		return
 	}
 
-	err = msg.Okay(conn)
+	err = msg.Okay(cc)
 	if err != nil {
-		conn.Close()
+		cc.Close()
 		return
 	}
 
-	l := proxy.NewListener()
+	l := conn.NewListener()
 	p := proxy.Wrap(name, l)
 	p.Bind(&dialer{addr})
 	err = c.service.Proxy(p)
@@ -48,29 +49,29 @@ func (c *Client) Proxy(name, token, desc, addr string) (err error) {
 		return
 	}
 
-	pp := &Proxy{
+	h := &handler{
 		Client:   c,
 		Name:     name,
-		Conn:     conn,
+		Conn:     cc,
 		Listener: l,
 	}
-	c.proxys.Store(name, pp)
-	if c.proxyc != nil {
-		c.proxyc <- pp
+	c.handlers.Store(name, h)
+	if c.handlerc != nil {
+		c.handlerc <- h
 	}
 	return
 }
 
 func (c *Client) Serve(ctx context.Context) (err error) {
 	c.errc = make(chan error, 1)
-	c.proxyc = make(chan *Proxy, 16)
+	c.handlerc = make(chan *handler, 16)
 	ctx, cancel := context.WithCancel(ctx)
 	defer func() {
 		cancel()
 	}()
 
-	c.proxys.Range(func(key, val interface{}) bool {
-		go val.(*Proxy).loopMessage(ctx)
+	c.handlers.Range(func(key, val interface{}) bool {
+		go val.(*handler).loopMessage(ctx)
 		return true
 	})
 
@@ -83,8 +84,8 @@ func (c *Client) Serve(ctx context.Context) (err error) {
 
 	for {
 		select {
-		case p := <-c.proxyc:
-			go p.loopMessage(ctx)
+		case h := <-c.handlerc:
+			go h.loopMessage(ctx)
 		case err = <-c.errc:
 			return
 		case <-ctx.Done():

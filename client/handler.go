@@ -4,30 +4,30 @@ import (
 	"context"
 	"net"
 
+	"github.com/4396/tun/conn"
 	"github.com/4396/tun/msg"
-	"github.com/4396/tun/proxy"
 )
 
-type Proxy struct {
+type handler struct {
 	*Client
 	Name     string
 	Conn     net.Conn
-	Listener *proxy.Listener
+	Listener *conn.Listener
 }
 
-func (p Proxy) loopMessage(ctx context.Context) {
+func (h handler) loopMessage(ctx context.Context) {
 	msgc := make(chan msg.Message, 16)
 	ctx, cancel := context.WithCancel(ctx)
 	defer func() {
 		cancel()
 		close(msgc)
-		p.Conn.Close()
+		h.Conn.Close()
 	}()
 
-	go p.processMessage(ctx, msgc)
+	go h.processMessage(ctx, msgc)
 
 	for {
-		m, err := msg.Read(p.Conn)
+		m, err := msg.Read(h.Conn)
 		if err != nil {
 			return
 		}
@@ -41,7 +41,7 @@ func (p Proxy) loopMessage(ctx context.Context) {
 	}
 }
 
-func (p *Proxy) processMessage(ctx context.Context, msgc <-chan msg.Message) {
+func (h *handler) processMessage(ctx context.Context, msgc <-chan msg.Message) {
 	for m := range msgc {
 		select {
 		case <-ctx.Done():
@@ -52,7 +52,7 @@ func (p *Proxy) processMessage(ctx context.Context, msgc <-chan msg.Message) {
 		var err error
 		switch mm := m.(type) {
 		case *msg.Dial:
-			err = p.dial(mm)
+			err = h.processDial(mm)
 			if err != nil {
 				// ...
 			}
@@ -61,14 +61,14 @@ func (p *Proxy) processMessage(ctx context.Context, msgc <-chan msg.Message) {
 	}
 }
 
-func (p *Proxy) dial(dial *msg.Dial) (err error) {
-	conn, err := p.Client.Dialer.Dial()
+func (h *handler) processDial(dial *msg.Dial) (err error) {
+	conn, err := h.Client.Dialer.Dial()
 	if err != nil {
 		return
 	}
 
 	err = msg.Write(conn, &msg.Worker{
-		Name: p.Name,
+		Name: h.Name,
 	})
 	if err != nil {
 		conn.Close()
@@ -83,7 +83,7 @@ func (p *Proxy) dial(dial *msg.Dial) (err error) {
 			return
 		}
 
-		err = p.Listener.Put(conn)
+		err = h.Listener.Put(conn)
 		if err != nil {
 			conn.Close()
 		}

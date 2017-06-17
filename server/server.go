@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 
+	"github.com/4396/tun/conn"
 	"github.com/4396/tun/proxy"
 	"github.com/4396/tun/traffic"
 	"github.com/4396/tun/vhost"
@@ -43,7 +44,7 @@ type httpProxy struct {
 }
 
 func (s *Server) ProxyHTTP(name, domain string) (err error) {
-	l := proxy.NewListener()
+	l := conn.NewListener()
 	p := proxy.Wrap(name, l)
 	err = s.Proxy(httpProxy{p, domain})
 	if err != nil {
