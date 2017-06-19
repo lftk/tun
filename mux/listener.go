@@ -3,6 +3,7 @@ package mux
 import (
 	"net"
 
+	"github.com/4396/tun/conn"
 	"github.com/xtaci/smux"
 )
 
@@ -20,8 +21,14 @@ type Listener struct {
 	sess *smux.Session
 }
 
-func (l *Listener) Accept() (net.Conn, error) {
-	return l.sess.AcceptStream()
+func (l *Listener) Accept() (c net.Conn, err error) {
+	st, err := l.sess.AcceptStream()
+	if err != nil {
+		return
+	}
+
+	c = conn.WithSnappy(st)
+	return
 }
 
 func (l *Listener) Close() error {

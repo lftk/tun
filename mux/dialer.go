@@ -3,6 +3,7 @@ package mux
 import (
 	"net"
 
+	"github.com/4396/tun/conn"
 	"github.com/xtaci/smux"
 )
 
@@ -25,8 +26,14 @@ type Dialer struct {
 	sess *smux.Session
 }
 
-func (d *Dialer) Dial() (net.Conn, error) {
-	return d.sess.OpenStream()
+func (d *Dialer) Dial() (c net.Conn, err error) {
+	st, err := d.sess.OpenStream()
+	if err != nil {
+		return
+	}
+
+	c = conn.WithSnappy(st)
+	return
 }
 
 func (d *Dialer) Close() error {
