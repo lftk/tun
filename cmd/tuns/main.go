@@ -2,10 +2,11 @@ package main
 
 import (
 	"context"
-	"log"
+	"flag"
 	"time"
 
 	"github.com/4396/tun/cmd"
+	"github.com/4396/tun/log"
 	"github.com/4396/tun/server"
 )
 
@@ -55,10 +56,10 @@ func (s *tunServer) Out(name string, b []byte) {
 }
 
 func main() {
+	flag.Parse()
+	log.Info("Start tun server")
 	s := newTunServer(":7000", ":7070")
-
 	ctx, cancel := context.WithCancel(context.Background())
-
 	time.AfterFunc(time.Second*30, func() {
 		_ = cancel
 		//cancel()
