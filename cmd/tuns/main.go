@@ -46,12 +46,12 @@ func (s *tunServer) AuthProxy(name, token, desc string) (err error) {
 	return
 }
 
-func (s *tunServer) In(name string, b []byte, n int64) {
-	//fmt.Println("in", name, string(b[:n]), n)
+func (s *tunServer) In(name string, b []byte) {
+	//fmt.Println("in", name, string(b[:n]))
 }
 
-func (s *tunServer) Out(name string, b []byte, n int64) {
-	//fmt.Println("out", name, string(b[:n]), n)
+func (s *tunServer) Out(name string, b []byte) {
+	//fmt.Println("out", name, string(b[:n]))
 }
 
 func main() {

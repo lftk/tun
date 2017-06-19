@@ -6,7 +6,6 @@ import (
 
 	"github.com/4396/tun/conn"
 	"github.com/4396/tun/proxy"
-	"github.com/4396/tun/traffic"
 	"github.com/4396/tun/vhost"
 )
 
@@ -71,7 +70,7 @@ func (s *Server) Kill(name string) {
 	}
 }
 
-func (s *Server) Traffic(traff traffic.Traffic) {
+func (s *Server) Traffic(traff proxy.Traffic) {
 	s.service.Traff = traff
 }
 

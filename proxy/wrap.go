@@ -5,9 +5,6 @@ import (
 	"io"
 	"net"
 	"sync"
-
-	"github.com/4396/tun/dialer"
-	"github.com/4396/tun/traffic"
 )
 
 func Wrap(name string, l net.Listener) Proxy {
@@ -22,7 +19,7 @@ type proxy struct {
 	name   string
 	closed bool
 	mu     sync.RWMutex
-	dialer dialer.Dialer
+	dialer Dialer
 }
 
 func (p *proxy) Name() string {
@@ -54,14 +51,14 @@ func (p *proxy) Accept() (net.Conn, error) {
 	return conn, err
 }
 
-func (p *proxy) Bind(d dialer.Dialer) error {
+func (p *proxy) Bind(d Dialer) error {
 	p.mu.Lock()
 	p.dialer = d
 	p.mu.Unlock()
 	return nil
 }
 
-func (p *proxy) Unbind(d dialer.Dialer) error {
+func (p *proxy) Unbind(d Dialer) error {
 	p.mu.Lock()
 	if p.dialer == d {
 		p.dialer = nil
@@ -71,8 +68,8 @@ func (p *proxy) Unbind(d dialer.Dialer) error {
 	return nil
 }
 
-func (p *proxy) Handle(conn net.Conn, traff traffic.Traffic) (err error) {
-	var dialer dialer.Dialer
+func (p *proxy) Handle(conn net.Conn, traff Traffic) (err error) {
+	var dialer Dialer
 	p.mu.RLock()
 	dialer = p.dialer
 	p.mu.RUnlock()
@@ -97,21 +94,21 @@ func (p *proxy) Handle(conn net.Conn, traff traffic.Traffic) (err error) {
 type trafficConn struct {
 	name string
 	net.Conn
-	traffic.Traffic
+	Traffic
 }
 
 func (tc trafficConn) Read(b []byte) (n int, err error) {
 	n, err = tc.Conn.Read(b)
-	if tc.Traffic != nil && n > 0 {
-		tc.Traffic.In(tc.name, b[:n], int64(n))
+	if tc.Traffic != nil {
+		tc.Traffic.In(tc.name, b[:n])
 	}
 	return
 }
 
 func (tc trafficConn) Write(b []byte) (n int, err error) {
 	n, err = tc.Conn.Write(b)
-	if tc.Traffic != nil && n > 0 {
-		tc.Traffic.Out(tc.name, b[:n], int64(n))
+	if tc.Traffic != nil {
+		tc.Traffic.Out(tc.name, b[:n])
 	}
 	return
 }

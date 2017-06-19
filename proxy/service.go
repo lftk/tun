@@ -6,13 +6,11 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/4396/tun/dialer"
-	"github.com/4396/tun/traffic"
 	"github.com/golang/sync/syncmap"
 )
 
 type Service struct {
-	Traff   traffic.Traffic
+	Traff   Traffic
 	proxies syncmap.Map
 	proxyc  chan Proxy
 	connc   chan proxyConn
@@ -99,7 +97,7 @@ func (s *Service) Kill(name string) (p Proxy) {
 
 var ErrInvalidProxy = errors.New("Invalid proxy")
 
-func (s *Service) Register(name string, dialer dialer.Dialer) (err error) {
+func (s *Service) Register(name string, dialer Dialer) (err error) {
 	if val, ok := s.proxies.Load(name); ok {
 		err = val.(Proxy).Bind(dialer)
 	} else {
@@ -108,7 +106,7 @@ func (s *Service) Register(name string, dialer dialer.Dialer) (err error) {
 	return
 }
 
-func (s *Service) Unregister(name string, dialer dialer.Dialer) (err error) {
+func (s *Service) Unregister(name string, dialer Dialer) (err error) {
 	if val, ok := s.proxies.Load(name); ok {
 		err = val.(Proxy).Unbind(dialer)
 	} else {
