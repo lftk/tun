@@ -6,12 +6,13 @@ import (
 
 	"github.com/4396/tun/conn"
 	"github.com/4396/tun/msg"
+	"github.com/4396/tun/mux"
 )
 
 type handler struct {
-	*Client
 	Name     string
 	Conn     net.Conn
+	Dialer   *mux.Dialer
 	Listener *conn.Listener
 }
 
@@ -62,7 +63,7 @@ func (h *handler) processMessage(ctx context.Context, msgc <-chan msg.Message) {
 }
 
 func (h *handler) processDial(dial *msg.Dial) (err error) {
-	conn, err := h.Client.Dialer.Dial()
+	conn, err := h.Dialer.Dial()
 	if err != nil {
 		return
 	}

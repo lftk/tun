@@ -6,7 +6,7 @@ import (
 	"io"
 )
 
-var MaxMsgLength int64 = 10240
+var MaxMsgLength int64 = 1024
 
 func readMsg(r io.Reader) (t byte, b []byte, err error) {
 	var (
@@ -97,7 +97,7 @@ func Okay(r io.Reader) (err error) {
 	case *Error:
 		err = errors.New(mm.Message)
 	default:
-		err = errors.New("Unexpected error")
+		err = errors.New("Unexpected message")
 	}
 	return
 }

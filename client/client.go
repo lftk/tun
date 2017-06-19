@@ -46,14 +46,15 @@ func (c *Client) Proxy(name, token, desc, addr string) (err error) {
 	p.Bind(&dialer{addr})
 	err = c.service.Proxy(p)
 	if err != nil {
+		cc.Close()
 		return
 	}
 
 	h := &handler{
-		Client:   c,
 		Name:     name,
 		Conn:     cc,
 		Listener: l,
+		Dialer:   c.Dialer,
 	}
 	c.handlers.Store(name, h)
 	if c.handlerc != nil {
