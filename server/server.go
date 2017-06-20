@@ -10,17 +10,39 @@ import (
 )
 
 type Server struct {
-	Addr     string
-	HttpAddr string
+	listener     net.Listener
+	httpListener net.Listener
+	auth         AuthFunc
+	muxer        vhost.Muxer
+	service      proxy.Service
+	connc        chan net.Conn
+	httpConnc    chan net.Conn
+	errc         chan error
+}
 
-	Auth func(name, token, desc string) error
+type AuthFunc func(name, token, desc string) error
 
-	muxer   vhost.Muxer
-	service proxy.Service
+func Listen(addr, httpAddr string, auth AuthFunc) (s *Server, err error) {
+	var l, h net.Listener
+	l, err = net.Listen("tcp", addr)
+	if err != nil {
+		return
+	}
 
-	errc      chan error
-	connc     chan net.Conn
-	httpConnc chan net.Conn
+	if httpAddr != "" {
+		h, err = net.Listen("tcp", httpAddr)
+		if err != nil {
+			l.Close()
+			return
+		}
+	}
+
+	s = &Server{
+		listener:     l,
+		httpListener: h,
+		auth:         auth,
+	}
+	return
 }
 
 func (s *Server) ProxyTCP(name, addr string) (err error) {
@@ -74,26 +96,7 @@ func (s *Server) Traffic(traff proxy.Traffic) {
 	s.service.Traff = traff
 }
 
-func (s *Server) ListenAndServe(ctx context.Context) (err error) {
-	var l, h net.Listener
-	l, err = net.Listen("tcp", s.Addr)
-	if err != nil {
-		return
-	}
-
-	if s.HttpAddr != "" {
-		h, err = net.Listen("tcp", s.HttpAddr)
-		if err != nil {
-			l.Close()
-			return
-		}
-	}
-
-	err = s.Serve(ctx, l, h)
-	return
-}
-
-func (s *Server) Serve(ctx context.Context, l, h net.Listener) (err error) {
+func (s *Server) Serve(ctx context.Context) (err error) {
 	s.errc = make(chan error, 1)
 	s.connc = make(chan net.Conn, 16)
 	s.httpConnc = make(chan net.Conn, 16)
@@ -103,20 +106,23 @@ func (s *Server) Serve(ctx context.Context, l, h net.Listener) (err error) {
 		cancel()
 
 		close(s.connc)
-		close(s.httpConnc)
-
-		// close conn
-		for conn := range s.httpConnc {
+		for conn := range s.connc {
 			conn.Close()
 		}
-		for conn := range s.connc {
+
+		close(s.httpConnc)
+		for conn := range s.httpConnc {
 			conn.Close()
 		}
 	}()
 
-	go s.listen(ctx, l, s.connc)
-	if h != nil {
-		go s.listen(ctx, h, s.httpConnc)
+	for l, cc := range map[net.Listener]chan net.Conn{
+		s.listener:     s.connc,
+		s.httpListener: s.httpConnc,
+	} {
+		if l != nil {
+			go s.listen(ctx, l, cc)
+		}
 	}
 
 	go func() {

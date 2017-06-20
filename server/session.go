@@ -86,8 +86,8 @@ func (s *session) processMessage(ctx context.Context, msgc <-chan message) {
 }
 
 func (s *session) processProxy(conn net.Conn, proxy *msg.Proxy) (err error) {
-	if s.Server.Auth != nil {
-		err = s.Server.Auth(proxy.Name, proxy.Token, proxy.Desc)
+	if s.Server.auth != nil {
+		err = s.Server.auth(proxy.Name, proxy.Token, proxy.Desc)
 		if err != nil {
 			msg.ReplyError(conn, err.Error())
 			return

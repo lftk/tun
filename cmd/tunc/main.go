@@ -12,7 +12,6 @@ import (
 	"github.com/4396/tun/client"
 	"github.com/4396/tun/cmd"
 	"github.com/4396/tun/log"
-	"github.com/4396/tun/mux"
 )
 
 func webServer(addr string) {
@@ -48,7 +47,21 @@ func tcpServer(addr string) {
 	}
 }
 
-func tcpProxy(c *client.Client, name, token, port, addr string) (err error) {
+type tunClient struct {
+	*client.Client
+}
+
+func Dial(addr string) (c *tunClient, err error) {
+	cli, err := client.Dial(addr)
+	if err != nil {
+		return
+	}
+
+	c = &tunClient{Client: cli}
+	return
+}
+
+func (c *tunClient) ProxyTCP(name, token, port, addr string) (err error) {
 	desc, err := cmd.Encode(&cmd.Proxy{
 		Type: cmd.TCP,
 		Port: port,
@@ -57,11 +70,11 @@ func tcpProxy(c *client.Client, name, token, port, addr string) (err error) {
 		return
 	}
 
-	err = c.Proxy(name, token, desc, addr)
+	err = c.Client.Proxy(name, token, desc, addr)
 	return
 }
 
-func httpProxy(c *client.Client, name, token, domain, addr string) (err error) {
+func (c *tunClient) ProxyHTTP(name, token, domain, addr string) (err error) {
 	desc, err := cmd.Encode(&cmd.Proxy{
 		Type:   cmd.HTTP,
 		Domain: domain,
@@ -70,7 +83,7 @@ func httpProxy(c *client.Client, name, token, domain, addr string) (err error) {
 		return
 	}
 
-	err = c.Proxy(name, token, desc, addr)
+	err = c.Client.Proxy(name, token, desc, addr)
 	return
 }
 
@@ -81,31 +94,20 @@ func main() {
 	go webServer(":3456")
 	go tcpServer(":4567")
 
-	dialer, err := mux.Dial(":7000")
+	c, err := Dial(":7000")
 	if err != nil {
 		return
 	}
 
-	c := &client.Client{
-		Dialer: dialer,
-	}
-
-	err = httpProxy(c, "web1", "token", "web1", ":3456")
+	err = c.ProxyTCP("tcp1", "token", ":6060", ":4567")
 	if err != nil {
-		log.Error(err)
-		return
+		log.Fatal(err)
 	}
 
-	err = tcpProxy(c, "tcp1", "token", ":6060", ":4567")
+	err = c.ProxyHTTP("web1", "token", "web1", ":3456")
 	if err != nil {
-		log.Error(err)
-		return
+		log.Fatal(err)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	time.AfterFunc(time.Second*3, func() {
-		_ = cancel
-		// cancel()
-	})
-	log.Fatal(c.Serve(ctx))
+	log.Fatal(c.Serve(context.Background()))
 }

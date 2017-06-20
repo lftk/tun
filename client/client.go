@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"net"
 
 	"github.com/4396/tun/conn"
 	"github.com/4396/tun/msg"
@@ -11,16 +12,30 @@ import (
 )
 
 type Client struct {
-	Dialer *mux.Dialer
-
+	dialer   *mux.Dialer
+	service  proxy.Service
 	handlers syncmap.Map
 	handlerc chan *handler
-	service  proxy.Service
 	errc     chan error
 }
 
+func Dial(addr string) (c *Client, err error) {
+	conn, err := net.Dial("tcp", addr)
+	if err != nil {
+		return
+	}
+
+	dialer, err := mux.Dial(conn)
+	if err != nil {
+		return
+	}
+
+	c = &Client{dialer: dialer}
+	return
+}
+
 func (c *Client) Proxy(name, token, desc, addr string) (err error) {
-	cc, err := c.Dialer.Dial()
+	cc, err := c.dialer.Dial()
 	if err != nil {
 		return
 	}
@@ -54,7 +69,7 @@ func (c *Client) Proxy(name, token, desc, addr string) (err error) {
 		Name:     name,
 		Conn:     cc,
 		Listener: l,
-		Dialer:   c.Dialer,
+		Dialer:   c.dialer,
 	}
 	c.handlers.Store(name, h)
 	if c.handlerc != nil {

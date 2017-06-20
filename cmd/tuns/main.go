@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"time"
 
 	"github.com/4396/tun/cmd"
 	"github.com/4396/tun/log"
@@ -14,14 +13,15 @@ type tunServer struct {
 	*server.Server
 }
 
-func newTunServer(addr, httpAddr string) (s *tunServer) {
+func Listen(addr, httpAddr string) (s *tunServer, err error) {
 	s = new(tunServer)
-	s.Server = &server.Server{
-		Addr:     addr,
-		HttpAddr: httpAddr,
-		Auth:     s.AuthProxy,
+	svr, err := server.Listen(addr, httpAddr, s.AuthProxy)
+	if err != nil {
+		return
 	}
-	s.Traffic(s)
+
+	svr.Traffic(s)
+	s.Server = svr
 	return
 }
 
@@ -58,14 +58,10 @@ func (s *tunServer) Out(name string, b []byte) {
 func main() {
 	flag.Parse()
 	log.Info("Start tun server")
-	s := newTunServer(":7000", ":7070")
-	ctx, cancel := context.WithCancel(context.Background())
-	time.AfterFunc(time.Second*30, func() {
-		_ = cancel
-		//cancel()
-		//s.Kill("web1")
-		//time.Sleep(time.Second * 3)
-		//s.HttpProxy("web1", "web1")
-	})
-	log.Fatal(s.ListenAndServe(ctx))
+
+	s, err := Listen(":7000", ":7070")
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Fatal(s.Serve(context.Background()))
 }
