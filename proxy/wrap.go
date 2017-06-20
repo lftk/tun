@@ -51,21 +51,28 @@ func (p *proxy) Accept() (net.Conn, error) {
 	return conn, err
 }
 
-func (p *proxy) Bind(d Dialer) error {
+func (p *proxy) Bind(dialer Dialer) (err error) {
 	p.mu.Lock()
-	p.dialer = d
-	p.mu.Unlock()
+	defer p.mu.Unlock()
+
+	if p.dialer != nil {
+		err = errors.New("Exists dialer")
+		return
+	}
+
+	p.dialer = dialer
 	return nil
 }
 
-func (p *proxy) Unbind(d Dialer) error {
+func (p *proxy) Unbind(dialer Dialer) (err error) {
 	p.mu.Lock()
-	if p.dialer == d {
+	defer p.mu.Unlock()
+
+	if p.dialer == dialer {
 		p.dialer = nil
-		d.Close()
+		dialer.Close()
 	}
-	p.mu.Unlock()
-	return nil
+	return
 }
 
 func (p *proxy) Handle(conn net.Conn, traff Traffic) (err error) {

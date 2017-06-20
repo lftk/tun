@@ -96,7 +96,7 @@ func main() {
 
 	c, err := Dial(":7000")
 	if err != nil {
-		return
+		log.Fatal(err)
 	}
 
 	err = c.ProxyTCP("tcp1", "token", ":6060", ":4567")
@@ -109,5 +109,5 @@ func main() {
 		log.Fatal(err)
 	}
 
-	log.Fatal(c.Serve(context.Background()))
+	log.Fatal(c.Run(context.Background()))
 }

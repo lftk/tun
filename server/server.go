@@ -96,7 +96,7 @@ func (s *Server) Traffic(traff proxy.Traffic) {
 	s.service.Traff = traff
 }
 
-func (s *Server) Serve(ctx context.Context) (err error) {
+func (s *Server) Run(ctx context.Context) (err error) {
 	s.errc = make(chan error, 1)
 	s.connc = make(chan net.Conn, 16)
 	s.httpConnc = make(chan net.Conn, 16)

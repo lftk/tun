@@ -78,7 +78,7 @@ func (c *Client) Proxy(name, token, desc, addr string) (err error) {
 	return
 }
 
-func (c *Client) Serve(ctx context.Context) (err error) {
+func (c *Client) Run(ctx context.Context) (err error) {
 	c.errc = make(chan error, 1)
 	c.handlerc = make(chan *handler, 16)
 	ctx, cancel := context.WithCancel(ctx)

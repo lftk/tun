@@ -15,7 +15,7 @@ type tunServer struct {
 
 func Listen(addr, httpAddr string) (s *tunServer, err error) {
 	s = new(tunServer)
-	svr, err := server.Listen(addr, httpAddr, s.AuthProxy)
+	svr, err := server.Listen(addr, httpAddr, s.Auth)
 	if err != nil {
 		return
 	}
@@ -25,7 +25,7 @@ func Listen(addr, httpAddr string) (s *tunServer, err error) {
 	return
 }
 
-func (s *tunServer) AuthProxy(name, token, desc string) (err error) {
+func (s *tunServer) Auth(name, token, desc string) (err error) {
 	var p cmd.Proxy
 	err = cmd.Decode(desc, &p)
 	if err != nil {
@@ -63,5 +63,5 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Fatal(s.Serve(context.Background()))
+	log.Fatal(s.Run(context.Background()))
 }
