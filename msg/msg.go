@@ -6,16 +6,19 @@ import (
 
 type Message interface{}
 
-type OK struct{}
-
 type Error struct {
 	Message string
 }
 
 type Proxy struct {
-	Name  string
-	Token string
-	Desc  string
+	Name    string
+	Token   string
+	Desc    string
+	Version string
+}
+
+type Version struct {
+	Version string
 }
 
 type Dial struct{}
@@ -33,9 +36,9 @@ func typeof(v interface{}) reflect.Type {
 var (
 	msgTypes = make(map[reflect.Type]byte)
 	typeMsgs = []reflect.Type{
-		typeof((*OK)(nil)),
 		typeof((*Error)(nil)),
 		typeof((*Proxy)(nil)),
+		typeof((*Version)(nil)),
 		typeof((*Dial)(nil)),
 		typeof((*Worker)(nil)),
 		typeof((*StartWork)(nil)),

@@ -5,9 +5,11 @@ import (
 	"net"
 
 	"github.com/4396/tun/conn"
+	"github.com/4396/tun/log"
 	"github.com/4396/tun/msg"
 	"github.com/4396/tun/mux"
 	"github.com/4396/tun/proxy"
+	"github.com/4396/tun/version"
 	"github.com/golang/sync/syncmap"
 )
 
@@ -40,18 +42,33 @@ func (c *Client) Proxy(name, token, desc, addr string) (err error) {
 		return
 	}
 
+	ver := version.Version
 	err = msg.Write(cc, &msg.Proxy{
-		Name:  name,
-		Token: token,
-		Desc:  desc,
+		Name:    name,
+		Token:   token,
+		Desc:    desc,
+		Version: ver,
 	})
 	if err != nil {
 		cc.Close()
 		return
 	}
 
-	err = msg.Okay(cc)
+	m, err := msg.Read(cc)
 	if err != nil {
+		cc.Close()
+		return
+	}
+
+	switch mm := m.(type) {
+	case *msg.Version:
+		log.Infof("Version=%s", mm.Version)
+	case *msg.Error:
+		log.Error(mm.Message)
+		cc.Close()
+		return
+	default:
+		log.Error("Unexpected response")
 		cc.Close()
 		return
 	}

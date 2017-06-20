@@ -23,11 +23,11 @@ func unpack(t byte, b []byte, in Message) (msg Message, err error) {
 }
 
 func UnPackInto(b []byte, msg Message) (err error) {
-	_, err = unpack(0, b, msg)
+	_, err = unpack(' ', b, msg)
 	return
 }
 
-func UnPack(t byte, b []byte) (msg Message, err error) {
+func UnPack(t byte, b []byte) (Message, error) {
 	return unpack(t, b, nil)
 }
 

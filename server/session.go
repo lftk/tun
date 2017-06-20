@@ -6,6 +6,7 @@ import (
 
 	"github.com/4396/tun/msg"
 	"github.com/4396/tun/mux"
+	"github.com/4396/tun/version"
 )
 
 type session struct {
@@ -89,7 +90,9 @@ func (s *session) processProxy(conn net.Conn, proxy *msg.Proxy) (err error) {
 	if s.Server.auth != nil {
 		err = s.Server.auth(proxy.Name, proxy.Token, proxy.Desc)
 		if err != nil {
-			msg.ReplyError(conn, err.Error())
+			msg.Write(conn, &msg.Error{
+				Message: err.Error(),
+			})
 			return
 		}
 	}
@@ -100,11 +103,15 @@ func (s *session) processProxy(conn net.Conn, proxy *msg.Proxy) (err error) {
 	}
 	err = s.Server.service.Register(proxy.Name, a)
 	if err != nil {
-		msg.ReplyError(conn, err.Error())
+		msg.Write(conn, &msg.Error{
+			Message: err.Error(),
+		})
 		return
 	}
 
-	err = msg.ReplyOK(conn)
+	err = msg.Write(conn, &msg.Version{
+		Version: version.Version,
+	})
 	if err != nil {
 		return
 	}
