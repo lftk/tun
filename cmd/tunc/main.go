@@ -3,14 +3,15 @@ package main
 import (
 	"bufio"
 	"context"
+	"flag"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"time"
 
 	"github.com/4396/tun/client"
 	"github.com/4396/tun/cmd"
+	"github.com/4396/tun/log"
 	"github.com/4396/tun/mux"
 )
 
@@ -31,19 +32,19 @@ func tcpServer(addr string) {
 	for {
 		conn, err := l.Accept()
 		if err != nil {
-			log.Println(err)
+			log.Error(err)
 			return
 		}
 
 		r := bufio.NewReader(conn)
 		req, err := http.ReadRequest(r)
 		if err != nil {
-			log.Println(err)
+			log.Error(err)
 			return
 		}
 
-		log.Printf("%+v\n", req)
-		log.Println(req.Method, req.Host)
+		log.Infof("%+v\n", req)
+		log.Info(req.Method, req.Host)
 	}
 }
 
@@ -74,6 +75,9 @@ func httpProxy(c *client.Client, name, token, domain, addr string) (err error) {
 }
 
 func main() {
+	flag.Parse()
+	log.Info("Start tun client")
+
 	go webServer(":3456")
 	go tcpServer(":4567")
 
@@ -88,13 +92,13 @@ func main() {
 
 	err = httpProxy(c, "web1", "token", "web1", ":3456")
 	if err != nil {
-		log.Println(err)
+		log.Error(err)
 		return
 	}
 
 	err = tcpProxy(c, "tcp1", "token", ":6060", ":4567")
 	if err != nil {
-		log.Println(err)
+		log.Error(err)
 		return
 	}
 
@@ -103,6 +107,5 @@ func main() {
 		_ = cancel
 		// cancel()
 	})
-
 	log.Fatal(c.Serve(ctx))
 }

@@ -1,19 +1,18 @@
 package conn
 
 import (
+	"errors"
 	"fmt"
 	"net"
 )
 
 type Listener struct {
-	connc  chan net.Conn
-	closed chan interface{}
+	connc chan net.Conn
 }
 
 func NewListener() *Listener {
 	return &Listener{
-		connc:  make(chan net.Conn, 16),
-		closed: make(chan interface{}),
+		connc: make(chan net.Conn, 16),
 	}
 }
 
@@ -28,7 +27,11 @@ func (l *Listener) Put(conn net.Conn) (err error) {
 }
 
 func (l *Listener) Accept() (conn net.Conn, err error) {
-	conn = <-l.connc
+	var ok bool
+	conn, ok = <-l.connc
+	if !ok {
+		err = errors.New("Listener closed")
+	}
 	return
 }
 
