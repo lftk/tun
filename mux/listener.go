@@ -34,3 +34,7 @@ func (l *Listener) Accept() (c net.Conn, err error) {
 func (l *Listener) Close() error {
 	return l.sess.Close()
 }
+
+func (l *Listener) IsClosed() bool {
+	return l.sess.IsClosed()
+}

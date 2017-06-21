@@ -34,3 +34,7 @@ func (d *Dialer) Dial() (c net.Conn, err error) {
 func (d *Dialer) Close() error {
 	return d.sess.Close()
 }
+
+func (d *Dialer) IsClosed() bool {
+	return d.sess.IsClosed()
+}

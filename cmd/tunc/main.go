@@ -94,20 +94,28 @@ func main() {
 	go webServer(":3456")
 	go tcpServer(":4567")
 
-	c, err := Dial(":7000")
-	if err != nil {
-		log.Fatal(err)
-	}
+	ctx := context.Background()
+	for {
+		c, err := Dial(":7000")
+		if err != nil {
+			time.Sleep(time.Second)
+			log.Info("Reconnect ...")
+			continue
+		}
 
-	err = c.ProxyTCP("tcp1", "token", ":6060", ":4567")
-	if err != nil {
-		log.Fatal(err)
-	}
+		err = c.ProxyTCP("tcp1", "token", ":6060", ":4567")
+		if err != nil {
+			log.Fatal(err)
+		}
 
-	err = c.ProxyHTTP("web1", "token", "web1", ":3456")
-	if err != nil {
-		log.Fatal(err)
-	}
+		err = c.ProxyHTTP("web1", "token", "web1", ":3456")
+		if err != nil {
+			log.Fatal(err)
+		}
 
-	log.Fatal(c.Run(context.Background()))
+		err = c.Run(ctx)
+		if err != nil {
+			log.Errorf("c.Run failed, err=%v", err)
+		}
+	}
 }

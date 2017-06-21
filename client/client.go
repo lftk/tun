@@ -2,7 +2,9 @@ package client
 
 import (
 	"context"
+	"errors"
 	"net"
+	"time"
 
 	"github.com/4396/tun/conn"
 	"github.com/4396/tun/log"
@@ -11,6 +13,11 @@ import (
 	"github.com/4396/tun/proxy"
 	"github.com/4396/tun/version"
 	"github.com/golang/sync/syncmap"
+)
+
+var (
+	ErrDialerClosed  = errors.New("Dialer closed")
+	ErrUnexpectedMsg = errors.New("Unexpected response")
 )
 
 type Client struct {
@@ -64,11 +71,11 @@ func (c *Client) Proxy(name, token, desc, addr string) (err error) {
 	case *msg.Version:
 		log.Infof("Version=%s", mm.Version)
 	case *msg.Error:
-		log.Error(mm.Message)
+		err = errors.New(mm.Message)
 		cc.Close()
 		return
 	default:
-		log.Error("Unexpected response")
+		err = ErrUnexpectedMsg
 		cc.Close()
 		return
 	}
@@ -99,8 +106,10 @@ func (c *Client) Run(ctx context.Context) (err error) {
 	c.errc = make(chan error, 1)
 	c.handlerc = make(chan *handler, 16)
 	ctx, cancel := context.WithCancel(ctx)
+	ticker := time.NewTicker(time.Second)
 	defer func() {
 		cancel()
+		ticker.Stop()
 	}()
 
 	c.handlers.Range(func(key, val interface{}) bool {
@@ -117,6 +126,11 @@ func (c *Client) Run(ctx context.Context) (err error) {
 
 	for {
 		select {
+		case <-ticker.C:
+			if c.dialer.IsClosed() {
+				err = ErrDialerClosed
+				return
+			}
 		case h := <-c.handlerc:
 			go h.loopMessage(ctx)
 		case err = <-c.errc:
