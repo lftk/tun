@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/4396/tun/conn"
-	"github.com/4396/tun/log"
 	"github.com/4396/tun/msg"
 	"github.com/4396/tun/mux"
 	"github.com/4396/tun/proxy"
@@ -69,7 +68,11 @@ func (c *Client) Proxy(name, token, desc, addr string) (err error) {
 
 	switch mm := m.(type) {
 	case *msg.Version:
-		log.Infof("Version=%s", mm.Version)
+		err = version.CompatServer(mm.Version)
+		if err != nil {
+			cc.Close()
+			return
+		}
 	case *msg.Error:
 		err = errors.New(mm.Message)
 		cc.Close()

@@ -7,6 +7,7 @@ import (
 	"github.com/4396/tun/cmd"
 	"github.com/4396/tun/log"
 	"github.com/4396/tun/server"
+	"github.com/4396/tun/version"
 )
 
 type tunServer struct {
@@ -57,7 +58,7 @@ func (s *tunServer) Out(name string, b []byte) {
 
 func main() {
 	flag.Parse()
-	log.Info("Start tun server")
+	log.Infof("Start tun server, version is %s", version.Version)
 
 	s, err := Listen(":7000", ":7070")
 	if err != nil {

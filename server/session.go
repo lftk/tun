@@ -86,22 +86,29 @@ func (s *session) processMessage(ctx context.Context, msgc <-chan message) {
 	}
 }
 
-func (s *session) processProxy(conn net.Conn, proxy *msg.Proxy) (err error) {
+func (s *session) registerProxy(conn net.Conn, proxy *msg.Proxy) (a *agent, err error) {
+	err = version.CompatClient(proxy.Version)
+	if err != nil {
+		return
+	}
+
 	if s.Server.auth != nil {
 		err = s.Server.auth(proxy.Name, proxy.Token, proxy.Desc)
 		if err != nil {
-			msg.Write(conn, &msg.Error{
-				Message: err.Error(),
-			})
 			return
 		}
 	}
 
-	a := &agent{
+	a = &agent{
 		conn:  conn,
 		connc: make(chan net.Conn, 16),
 	}
 	err = s.Server.service.Register(proxy.Name, a)
+	return
+}
+
+func (s *session) processProxy(conn net.Conn, proxy *msg.Proxy) (err error) {
+	a, err := s.registerProxy(conn, proxy)
 	if err != nil {
 		msg.Write(conn, &msg.Error{
 			Message: err.Error(),

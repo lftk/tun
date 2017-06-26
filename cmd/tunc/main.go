@@ -12,6 +12,7 @@ import (
 	"github.com/4396/tun/client"
 	"github.com/4396/tun/cmd"
 	"github.com/4396/tun/log"
+	"github.com/4396/tun/version"
 )
 
 func webServer(addr string) {
@@ -89,7 +90,7 @@ func (c *tunClient) ProxyHTTP(name, token, domain, addr string) (err error) {
 
 func main() {
 	flag.Parse()
-	log.Info("Start tun client")
+	log.Infof("Start tun client, version is %s", version.Version)
 
 	go webServer(":3456")
 	go tcpServer(":4567")
