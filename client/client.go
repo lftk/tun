@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"net"
+	"os"
+	"runtime"
 	"time"
 
 	"github.com/4396/tun/conn"
@@ -49,11 +51,15 @@ func (c *Client) Proxy(name, token, desc, addr string) (err error) {
 	}
 
 	ver := version.Version
+	hostname, _ := os.Hostname()
 	err = msg.Write(cc, &msg.Proxy{
-		Name:    name,
-		Token:   token,
-		Desc:    desc,
-		Version: ver,
+		Name:     name,
+		Token:    token,
+		Desc:     desc,
+		Version:  ver,
+		Hostname: hostname,
+		Os:       runtime.GOOS,
+		Arch:     runtime.GOARCH,
 	})
 	if err != nil {
 		cc.Close()

@@ -168,7 +168,10 @@ func (s *Server) handleConn(ctx context.Context, c net.Conn) {
 	select {
 	case <-ctx.Done():
 	default:
-		session{Server: s, Conn: c}.loopMessage(ctx)
+		(&session{
+			Server: s,
+			Conn:   c,
+		}).LoopMessage(ctx)
 	}
 }
 

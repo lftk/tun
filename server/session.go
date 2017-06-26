@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 
+	"github.com/4396/tun/log"
 	"github.com/4396/tun/msg"
 	"github.com/4396/tun/mux"
 	"github.com/4396/tun/version"
@@ -20,7 +21,7 @@ type message struct {
 	msg.Message
 }
 
-func (s session) loopMessage(ctx context.Context) {
+func (s *session) LoopMessage(ctx context.Context) {
 	l, err := mux.Listen(s.Conn)
 	if err != nil {
 		s.Conn.Close()
@@ -41,7 +42,7 @@ func (s session) loopMessage(ctx context.Context) {
 		}
 	}()
 
-	go s.processMessage(ctx, msgc)
+	go s.ProcessMessage(ctx, msgc)
 
 	for {
 		conn, err := l.Accept()
@@ -63,7 +64,7 @@ func (s session) loopMessage(ctx context.Context) {
 	}
 }
 
-func (s *session) processMessage(ctx context.Context, msgc <-chan message) {
+func (s *session) ProcessMessage(ctx context.Context, msgc <-chan message) {
 	for m := range msgc {
 		select {
 		case <-ctx.Done():
@@ -74,9 +75,9 @@ func (s *session) processMessage(ctx context.Context, msgc <-chan message) {
 		var err error
 		switch msg := m.Message.(type) {
 		case *msg.Proxy:
-			err = s.processProxy(m.Conn, msg)
+			err = s.ProcessProxy(m.Conn, msg)
 		case *msg.Worker:
-			err = s.processWorker(m.Conn, msg)
+			err = s.ProcessWorker(m.Conn, msg)
 		default:
 			m.Conn.Close()
 		}
@@ -86,7 +87,7 @@ func (s *session) processMessage(ctx context.Context, msgc <-chan message) {
 	}
 }
 
-func (s *session) registerProxy(conn net.Conn, proxy *msg.Proxy) (a *agent, err error) {
+func (s *session) RegisterProxy(conn net.Conn, proxy *msg.Proxy) (a *agent, err error) {
 	err = version.CompatClient(proxy.Version)
 	if err != nil {
 		return
@@ -107,8 +108,16 @@ func (s *session) registerProxy(conn net.Conn, proxy *msg.Proxy) (a *agent, err 
 	return
 }
 
-func (s *session) processProxy(conn net.Conn, proxy *msg.Proxy) (err error) {
-	a, err := s.registerProxy(conn, proxy)
+func (s *session) ProcessProxy(conn net.Conn, proxy *msg.Proxy) (err error) {
+	defer func() {
+		if err == nil {
+			log.Infof("Register proxy success, name=%s", proxy.Name)
+		} else {
+			log.Infof("Register proxy failed, name=%s, err=%v", proxy.Name, err)
+		}
+	}()
+
+	a, err := s.RegisterProxy(conn, proxy)
 	if err != nil {
 		msg.Write(conn, &msg.Error{
 			Message: err.Error(),
@@ -127,7 +136,7 @@ func (s *session) processProxy(conn net.Conn, proxy *msg.Proxy) (err error) {
 	return
 }
 
-func (s *session) processWorker(conn net.Conn, worker *msg.Worker) (err error) {
+func (s *session) ProcessWorker(conn net.Conn, worker *msg.Worker) (err error) {
 	a, ok := s.agent[worker.Name]
 	if !ok {
 		// ...

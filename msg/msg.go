@@ -11,10 +11,13 @@ type Error struct {
 }
 
 type Proxy struct {
-	Name    string
-	Token   string
-	Desc    string
-	Version string
+	Name     string
+	Token    string
+	Desc     string
+	Version  string
+	Hostname string
+	Os       string
+	Arch     string
 }
 
 type Version struct {
