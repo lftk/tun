@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"context"
-	"flag"
 	"fmt"
 	"net"
 	"net/http"
@@ -89,7 +88,6 @@ func (c *tunClient) ProxyHTTP(name, token, domain, addr string) (err error) {
 }
 
 func main() {
-	flag.Parse()
 	log.Infof("Start tun client, version is %s", version.Version)
 
 	go webServer(":3456")

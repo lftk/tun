@@ -2,6 +2,10 @@ package cmd
 
 import (
 	"encoding/json"
+	"flag"
+
+	"github.com/4396/tun/log"
+	"github.com/golang/glog"
 )
 
 const (
@@ -28,4 +32,14 @@ func Encode(p *Proxy) (desc string, err error) {
 func Decode(desc string, p *Proxy) (err error) {
 	err = json.Unmarshal([]byte(desc), p)
 	return
+}
+
+func init() {
+	if !flag.Parsed() {
+		flag.Parse()
+	}
+	log.FnInfo = glog.InfoDepth
+	log.FnWarning = glog.WarningDepth
+	log.FnError = glog.ErrorDepth
+	log.FnFatal = glog.FatalDepth
 }

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"flag"
 
 	"github.com/4396/tun/cmd"
 	"github.com/4396/tun/log"
@@ -57,7 +56,6 @@ func (s *tunServer) Out(name string, b []byte) {
 }
 
 func main() {
-	flag.Parse()
 	log.Infof("Start tun server, version is %s", version.Version)
 
 	s, err := Listen(":7000", ":7070")
