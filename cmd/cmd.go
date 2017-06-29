@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"encoding/json"
-	"flag"
 
 	"github.com/4396/tun/log"
 	"github.com/golang/glog"
@@ -65,8 +64,5 @@ func (l *logger) Fatal(depth int, args ...interface{}) {
 }
 
 func init() {
-	if !flag.Parsed() {
-		flag.Parse()
-	}
 	log.Logger = new(logger)
 }

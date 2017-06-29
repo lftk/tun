@@ -1,51 +1,16 @@
 package main
 
 import (
-	"bufio"
 	"context"
-	"fmt"
-	"net"
-	"net/http"
+	"flag"
 	"time"
 
 	"github.com/4396/tun/client"
 	"github.com/4396/tun/cmd"
 	"github.com/4396/tun/log"
 	"github.com/4396/tun/version"
+	"gopkg.in/ini.v1"
 )
-
-func webServer(addr string) {
-	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
-		fmt.Fprintln(w, time.Now().String())
-	})
-	http.ListenAndServe(addr, nil)
-}
-
-func tcpServer(addr string) {
-	l, err := net.Listen("tcp", addr)
-	if err != nil {
-		return
-	}
-
-	defer l.Close()
-	for {
-		conn, err := l.Accept()
-		if err != nil {
-			log.Error(err)
-			return
-		}
-
-		r := bufio.NewReader(conn)
-		req, err := http.ReadRequest(r)
-		if err != nil {
-			log.Error(err)
-			return
-		}
-
-		log.Infof("%+v\n", req)
-		log.Info(req.Method, req.Host)
-	}
-}
 
 type tunClient struct {
 	*client.Client
@@ -87,34 +52,42 @@ func (c *tunClient) ProxyHTTP(name, token, domain, addr string) (err error) {
 	return
 }
 
+var (
+	conf = flag.String("c", "conf/tunc.ini", "config file's path")
+)
+
 func main() {
+	flag.Parse()
 	log.Infof("Start tun client, version is %s", version.Version)
 
-	go webServer(":3456")
-	go tcpServer(":4567")
+	cfg, err := ini.InsensitiveLoad(*conf)
+	if err != nil {
+		log.Fatalf("Load config file failed, err=%v", err)
+		return
+	}
+	_ = cfg
 
-	ctx := context.Background()
+	var (
+		idx int64
+		ctx = context.Background()
+	)
 	for {
 		c, err := Dial(":7000")
 		if err != nil {
+			idx++
 			time.Sleep(time.Second)
-			log.Info("Reconnect ...")
+			log.Infof("Reconnect tun server %d", idx)
 			continue
 		}
+		log.Info("Connect tun server success")
 
-		err = c.ProxyTCP("tcp1", "token", ":6060", ":4567")
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		err = c.ProxyHTTP("web1", "token", "web1", ":3456")
-		if err != nil {
-			log.Fatal(err)
-		}
-
+		idx = 0
 		err = c.Run(ctx)
 		if err != nil {
-			log.Errorf("c.Run failed, err=%v", err)
+			if err != client.ErrDialerClosed {
+				log.Errorf("c.Run failed, err=%v", err)
+				return
+			}
 		}
 	}
 }
