@@ -4,6 +4,8 @@ import (
 	"context"
 	"flag"
 
+	"gopkg.in/ini.v1"
+
 	"github.com/4396/tun/cmd"
 	"github.com/4396/tun/log"
 	"github.com/4396/tun/server"
@@ -56,11 +58,25 @@ func (s *tunServer) Out(name string, b []byte) {
 	//fmt.Println("out", name, string(b[:n]))
 }
 
+var (
+	conf = flag.String("c", "conf/tuns.ini", "config file's path")
+)
+
 func main() {
 	flag.Parse()
 	log.Infof("Start tun server, version is %s", version.Version)
 
-	s, err := Listen(":7000", ":7070")
+	cfg, err := ini.InsensitiveLoad(*conf)
+	if err != nil {
+		log.Fatalf("Load config file failed, err=%v", err)
+		return
+	}
+
+	common := cfg.Section("common")
+	addr := common.Key("addr").String()
+	httpAddr := common.Key("http").String()
+
+	s, err := Listen(addr, httpAddr)
 	if err != nil {
 		log.Fatal(err)
 	}

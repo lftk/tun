@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"net"
 
 	"github.com/4396/tun/conn"
@@ -45,7 +46,8 @@ func Listen(addr, httpAddr string, auth AuthFunc) (s *Server, err error) {
 	return
 }
 
-func (s *Server) ProxyTCP(name, addr string) (err error) {
+func (s *Server) ProxyTCP(name string, port int) (err error) {
+	addr := fmt.Sprintf(":%d", port)
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
 		return

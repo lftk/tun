@@ -14,7 +14,7 @@ const (
 
 type Proxy struct {
 	Type   int
-	Port   string
+	Port   int
 	Domain string
 }
 
