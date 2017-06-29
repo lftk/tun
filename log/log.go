@@ -4,57 +4,85 @@ import (
 	"fmt"
 )
 
-var (
-	FnInfo    func(depth int, args ...interface{})
-	FnWarning func(depth int, args ...interface{})
-	FnError   func(depth int, args ...interface{})
-	FnFatal   func(depth int, args ...interface{})
-)
+type logger interface {
+	Verbose(depth int, args ...interface{})
+	Debug(depth int, args ...interface{})
+	Info(depth int, args ...interface{})
+	Warning(depth int, args ...interface{})
+	Error(depth int, args ...interface{})
+	Fatal(depth int, args ...interface{})
+}
+
+var Logger logger
+
+func Verbose(args ...interface{}) {
+	if Logger != nil {
+		Logger.Verbose(1, args...)
+	}
+}
+
+func Verbosef(format string, args ...interface{}) {
+	if Logger != nil {
+		Logger.Verbose(1, fmt.Sprintf(format, args...))
+	}
+}
+
+func Debug(args ...interface{}) {
+	if Logger != nil {
+		Logger.Debug(1, args...)
+	}
+}
+
+func Debugf(format string, args ...interface{}) {
+	if Logger != nil {
+		Logger.Debug(1, fmt.Sprintf(format, args...))
+	}
+}
 
 func Info(args ...interface{}) {
-	if FnInfo != nil {
-		FnInfo(1, args...)
+	if Logger != nil {
+		Logger.Info(1, args...)
 	}
 }
 
 func Infof(format string, args ...interface{}) {
-	if FnInfo != nil {
-		FnInfo(1, fmt.Sprintf(format, args...))
+	if Logger != nil {
+		Logger.Info(1, fmt.Sprintf(format, args...))
 	}
 }
 
 func Warning(args ...interface{}) {
-	if FnWarning != nil {
-		FnWarning(1, args...)
+	if Logger != nil {
+		Logger.Warning(1, args...)
 	}
 }
 
 func Warningf(format string, args ...interface{}) {
-	if FnWarning != nil {
-		FnWarning(1, fmt.Sprintf(format, args...))
+	if Logger != nil {
+		Logger.Warning(1, fmt.Sprintf(format, args...))
 	}
 }
 
 func Error(args ...interface{}) {
-	if FnError != nil {
-		FnError(1, args...)
+	if Logger != nil {
+		Logger.Error(1, args...)
 	}
 }
 
 func Errorf(format string, args ...interface{}) {
-	if FnError != nil {
-		FnError(1, fmt.Sprintf(format, args...))
+	if Logger != nil {
+		Logger.Error(1, fmt.Sprintf(format, args...))
 	}
 }
 
 func Fatal(args ...interface{}) {
-	if FnFatal != nil {
-		FnFatal(1, args...)
+	if Logger != nil {
+		Logger.Fatal(1, args...)
 	}
 }
 
 func Fatalf(format string, args ...interface{}) {
-	if FnFatal != nil {
-		FnFatal(1, fmt.Sprintf(format, args...))
+	if Logger != nil {
+		Logger.Fatal(1, fmt.Sprintf(format, args...))
 	}
 }

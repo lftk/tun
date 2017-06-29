@@ -34,12 +34,39 @@ func Decode(desc string, p *Proxy) (err error) {
 	return
 }
 
+type logger struct{}
+
+func (l *logger) Verbose(depth int, args ...interface{}) {
+	if glog.V(20) {
+		glog.InfoDepth(depth+1, args...)
+	}
+}
+
+func (l *logger) Debug(depth int, args ...interface{}) {
+	if glog.V(10) {
+		glog.InfoDepth(depth+1, args...)
+	}
+}
+
+func (l *logger) Info(depth int, args ...interface{}) {
+	glog.InfoDepth(depth+1, args...)
+}
+
+func (l *logger) Warning(depth int, args ...interface{}) {
+	glog.WarningDepth(depth+1, args...)
+}
+
+func (l *logger) Error(depth int, args ...interface{}) {
+	glog.ErrorDepth(depth+1, args...)
+}
+
+func (l *logger) Fatal(depth int, args ...interface{}) {
+	glog.FatalDepth(depth+1, args...)
+}
+
 func init() {
 	if !flag.Parsed() {
 		flag.Parse()
 	}
-	log.FnInfo = glog.InfoDepth
-	log.FnWarning = glog.WarningDepth
-	log.FnError = glog.ErrorDepth
-	log.FnFatal = glog.FatalDepth
+	log.Logger = new(logger)
 }
