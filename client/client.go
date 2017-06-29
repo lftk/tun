@@ -44,15 +44,10 @@ func Dial(addr string) (c *Client, err error) {
 	return
 }
 
-func (c *Client) Proxy(name, token, desc, addr string) (err error) {
-	cc, err := c.dialer.Dial()
-	if err != nil {
-		return
-	}
-
+func auth(conn net.Conn, name, token, desc, addr string) (err error) {
 	ver := version.Version
 	hostname, _ := os.Hostname()
-	err = msg.Write(cc, &msg.Proxy{
+	err = msg.Write(conn, &msg.Proxy{
 		Name:     name,
 		Token:    token,
 		Desc:     desc,
@@ -62,29 +57,33 @@ func (c *Client) Proxy(name, token, desc, addr string) (err error) {
 		Arch:     runtime.GOARCH,
 	})
 	if err != nil {
-		cc.Close()
 		return
 	}
 
-	m, err := msg.Read(cc)
+	m, err := msg.Read(conn)
 	if err != nil {
-		cc.Close()
 		return
 	}
 
 	switch mm := m.(type) {
 	case *msg.Version:
 		err = version.CompatServer(mm.Version)
-		if err != nil {
-			cc.Close()
-			return
-		}
 	case *msg.Error:
 		err = errors.New(mm.Message)
-		cc.Close()
-		return
 	default:
 		err = ErrUnexpectedMsg
+	}
+	return
+}
+
+func (c *Client) Proxy(name, token, desc, addr string) (err error) {
+	cc, err := c.dialer.Dial()
+	if err != nil {
+		return
+	}
+
+	err = auth(cc, name, token, desc, addr)
+	if err != nil {
 		cc.Close()
 		return
 	}
@@ -122,7 +121,7 @@ func (c *Client) Run(ctx context.Context) (err error) {
 	}()
 
 	c.handlers.Range(func(key, val interface{}) bool {
-		go val.(*handler).loopMessage(ctx)
+		go val.(*handler).LoopMessage(ctx)
 		return true
 	})
 
@@ -141,7 +140,7 @@ func (c *Client) Run(ctx context.Context) (err error) {
 				return
 			}
 		case h := <-c.handlerc:
-			go h.loopMessage(ctx)
+			go h.LoopMessage(ctx)
 		case err = <-c.errc:
 			return
 		case <-ctx.Done():

@@ -16,7 +16,7 @@ type handler struct {
 	Listener *conn.Listener
 }
 
-func (h handler) loopMessage(ctx context.Context) {
+func (h *handler) LoopMessage(ctx context.Context) {
 	msgc := make(chan msg.Message, 16)
 	ctx, cancel := context.WithCancel(ctx)
 	defer func() {
@@ -25,7 +25,7 @@ func (h handler) loopMessage(ctx context.Context) {
 		h.Conn.Close()
 	}()
 
-	go h.processMessage(ctx, msgc)
+	go h.ProcessMessage(ctx, msgc)
 
 	for {
 		m, err := msg.Read(h.Conn)
@@ -42,7 +42,7 @@ func (h handler) loopMessage(ctx context.Context) {
 	}
 }
 
-func (h *handler) processMessage(ctx context.Context, msgc <-chan msg.Message) {
+func (h *handler) ProcessMessage(ctx context.Context, msgc <-chan msg.Message) {
 	for m := range msgc {
 		select {
 		case <-ctx.Done():
@@ -53,7 +53,7 @@ func (h *handler) processMessage(ctx context.Context, msgc <-chan msg.Message) {
 		var err error
 		switch mm := m.(type) {
 		case *msg.Dial:
-			err = h.processDial(mm)
+			err = h.ProcessDial(mm)
 			if err != nil {
 				// ...
 			}
@@ -62,7 +62,7 @@ func (h *handler) processMessage(ctx context.Context, msgc <-chan msg.Message) {
 	}
 }
 
-func (h *handler) processDial(dial *msg.Dial) (err error) {
+func (h *handler) ProcessDial(dial *msg.Dial) (err error) {
 	conn, err := h.Dialer.Dial()
 	if err != nil {
 		return
