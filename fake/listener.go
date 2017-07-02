@@ -1,8 +1,7 @@
-package conn
+package fake
 
 import (
 	"errors"
-	"fmt"
 	"net"
 )
 
@@ -16,33 +15,27 @@ func NewListener() *Listener {
 	}
 }
 
-func (l *Listener) Put(conn net.Conn) (err error) {
-	defer func() {
-		if x := recover(); x != nil {
-			err = fmt.Errorf("%v", x)
-		}
-	}()
+func (l *Listener) Put(conn net.Conn) error {
 	l.connc <- conn
-	return
+	return nil
 }
 
 func (l *Listener) Accept() (conn net.Conn, err error) {
-	var ok bool
-	conn, ok = <-l.connc
+	conn, ok := <-l.connc
 	if !ok {
 		err = errors.New("Listener closed")
 	}
 	return
 }
 
-func (l *Listener) Addr() (addr net.Addr) {
-	return
+func (l *Listener) Addr() net.Addr {
+	return nil
 }
 
-func (l *Listener) Close() (err error) {
+func (l *Listener) Close() error {
 	close(l.connc)
 	for conn := range l.connc {
 		conn.Close()
 	}
-	return
+	return nil
 }

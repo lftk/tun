@@ -36,14 +36,6 @@ func newSession(s *Server, conn net.Conn) (sess *session, err error) {
 	return
 }
 
-func (s *session) Dial() (net.Conn, error) {
-	return s.Session.OpenConn()
-}
-
-func (s *session) Close() error {
-	return nil
-}
-
 func (s *session) Run(ctx context.Context) (err error) {
 	defer func() {
 		s.Session.Close()
@@ -104,6 +96,10 @@ func (s *session) handleProxy(proxy *msg.Proxy) (err error) {
 		}
 	}
 
-	err = s.Server.service.Register(proxy.Name, s)
+	d := &dialer{
+		Session: s.Session,
+		Name:    proxy.Name,
+	}
+	err = s.Server.service.Register(proxy.Name, d)
 	return
 }

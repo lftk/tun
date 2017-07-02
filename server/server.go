@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/4396/tun/conn"
+	"github.com/4396/tun/fake"
 	"github.com/4396/tun/proxy"
 	"github.com/4396/tun/vhost"
 )
@@ -16,8 +16,6 @@ type Server struct {
 	auth         AuthFunc
 	muxer        vhost.Muxer
 	service      proxy.Service
-	connc        chan net.Conn
-	httpConnc    chan net.Conn
 	errc         chan error
 }
 
@@ -42,6 +40,7 @@ func Listen(addr, httpAddr string, auth AuthFunc) (s *Server, err error) {
 		listener:     l,
 		httpListener: h,
 		auth:         auth,
+		errc:         make(chan error, 1),
 	}
 	return
 }
@@ -67,7 +66,7 @@ type httpProxy struct {
 }
 
 func (s *Server) ProxyHTTP(name, domain string) (err error) {
-	l := conn.NewListener()
+	l := fake.NewListener()
 	p := proxy.Wrap(name, l)
 	err = s.Proxy(httpProxy{p, domain})
 	if err != nil {
@@ -99,29 +98,28 @@ func (s *Server) Traffic(traff proxy.Traffic) {
 }
 
 func (s *Server) Run(ctx context.Context) (err error) {
-	s.errc = make(chan error, 1)
-	s.connc = make(chan net.Conn, 16)
-	s.httpConnc = make(chan net.Conn, 16)
-
+	connc := make(chan net.Conn, 16)
+	httpConnc := make(chan net.Conn, 16)
 	ctx, cancel := context.WithCancel(ctx)
 	defer func() {
 		cancel()
 
-		close(s.connc)
-		for conn := range s.connc {
+		close(connc)
+		for conn := range connc {
 			conn.Close()
 		}
 
-		close(s.httpConnc)
-		for conn := range s.httpConnc {
+		close(httpConnc)
+		for conn := range httpConnc {
 			conn.Close()
 		}
 	}()
 
-	go s.listen(ctx, s.listener, s.connc)
+	go s.listen(ctx, s.listener, connc)
 	if s.httpListener != nil {
-		go s.listen(ctx, s.httpListener, s.httpConnc)
+		go s.listen(ctx, s.httpListener, httpConnc)
 	}
+
 	go func() {
 		err := s.service.Serve(ctx)
 		if err != nil {
@@ -131,9 +129,9 @@ func (s *Server) Run(ctx context.Context) (err error) {
 
 	for {
 		select {
-		case c := <-s.connc:
+		case c := <-connc:
 			go s.handleConn(ctx, c)
-		case c := <-s.httpConnc:
+		case c := <-httpConnc:
 			go s.handleHttpConn(ctx, c)
 		case err = <-s.errc:
 			return
