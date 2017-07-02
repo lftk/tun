@@ -8,7 +8,6 @@ import (
 	"gopkg.in/ini.v1"
 
 	"github.com/4396/tun/client"
-	"github.com/4396/tun/cmd"
 	"github.com/4396/tun/log"
 	"github.com/4396/tun/version"
 )
@@ -27,32 +26,6 @@ func Dial(addr string) (c *tunClient, err error) {
 	return
 }
 
-func (c *tunClient) ProxyTCP(name, token, addr string, port int) (err error) {
-	desc, err := cmd.Encode(&cmd.Proxy{
-		Type: cmd.TCP,
-		Port: port,
-	})
-	if err != nil {
-		return
-	}
-
-	err = c.Client.Proxy(name, token, desc, addr)
-	return
-}
-
-func (c *tunClient) ProxyHTTP(name, token, addr, domain string) (err error) {
-	desc, err := cmd.Encode(&cmd.Proxy{
-		Type:   cmd.HTTP,
-		Domain: domain,
-	})
-	if err != nil {
-		return
-	}
-
-	err = c.Client.Proxy(name, token, desc, addr)
-	return
-}
-
 func (c *tunClient) LoadProxy(cfg *ini.File) (err error) {
 	for _, sec := range cfg.Sections() {
 		name := sec.Name()
@@ -60,24 +33,9 @@ func (c *tunClient) LoadProxy(cfg *ini.File) (err error) {
 			continue
 		}
 
-		var (
-			typ   = sec.Key("type").String()
-			token = sec.Key("token").String()
-			addr  = sec.Key("addr").String()
-		)
-		switch typ {
-		case "tcp":
-			var port int
-			port, err = sec.Key("port").Int()
-			if err == nil {
-				err = c.ProxyTCP(name, token, addr, port)
-			}
-		case "http":
-			domain := sec.Key("domain").String()
-			err = c.ProxyHTTP(name, token, addr, domain)
-		default:
-			log.Infof("Unknown proxy type, %s", name)
-		}
+		token := sec.Key("token").String()
+		addr := sec.Key("addr").String()
+		err = c.Proxy(name, token, addr)
 		if err != nil {
 			return
 		}

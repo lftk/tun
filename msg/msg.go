@@ -13,7 +13,6 @@ type Error struct {
 type Proxy struct {
 	Name     string
 	Token    string
-	Desc     string
 	Version  string
 	Hostname string
 	Os       string
@@ -23,14 +22,6 @@ type Proxy struct {
 type Version struct {
 	Version string
 }
-
-type Dial struct{}
-
-type Worker struct {
-	Name string
-}
-
-type StartWork struct{}
 
 func typeof(v interface{}) reflect.Type {
 	return reflect.TypeOf(v).Elem()
@@ -42,9 +33,6 @@ var (
 		typeof((*Error)(nil)),
 		typeof((*Proxy)(nil)),
 		typeof((*Version)(nil)),
-		typeof((*Dial)(nil)),
-		typeof((*Worker)(nil)),
-		typeof((*StartWork)(nil)),
 	}
 )
 

@@ -6,7 +6,6 @@ import (
 
 	"gopkg.in/ini.v1"
 
-	"github.com/4396/tun/cmd"
 	"github.com/4396/tun/log"
 	"github.com/4396/tun/server"
 	"github.com/4396/tun/version"
@@ -28,24 +27,11 @@ func Listen(addr, httpAddr string) (s *tunServer, err error) {
 	return
 }
 
-func (s *tunServer) Auth(name, token, desc string) (err error) {
-	var p cmd.Proxy
-	err = cmd.Decode(desc, &p)
-	if err != nil {
-		return
-	}
-
-	for _, p := range s.Server.Proxies() {
-		if p.Name() == name {
-			return
-		}
-	}
-
-	switch p.Type {
-	case cmd.TCP:
-		err = s.Server.ProxyTCP(name, p.Port)
-	case cmd.HTTP:
-		err = s.Server.ProxyHTTP(name, p.Domain)
+func (s *tunServer) Auth(name, token string) (err error) {
+	if name == "ssh" {
+		err = s.Server.ProxyTCP(name, 6060)
+	} else {
+		err = s.Server.ProxyHTTP(name, name)
 	}
 	return
 }

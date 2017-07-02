@@ -2,6 +2,8 @@ package log
 
 import (
 	"fmt"
+
+	"github.com/golang/glog"
 )
 
 type logger interface {
@@ -13,7 +15,37 @@ type logger interface {
 	Fatal(depth int, args ...interface{})
 }
 
-var Logger logger
+type glogger struct{}
+
+func (l *glogger) Verbose(depth int, args ...interface{}) {
+	if glog.V(20) {
+		glog.InfoDepth(depth+1, args...)
+	}
+}
+
+func (l *glogger) Debug(depth int, args ...interface{}) {
+	if glog.V(10) {
+		glog.InfoDepth(depth+1, args...)
+	}
+}
+
+func (l *glogger) Info(depth int, args ...interface{}) {
+	glog.InfoDepth(depth+1, args...)
+}
+
+func (l *glogger) Warning(depth int, args ...interface{}) {
+	glog.WarningDepth(depth+1, args...)
+}
+
+func (l *glogger) Error(depth int, args ...interface{}) {
+	glog.ErrorDepth(depth+1, args...)
+}
+
+func (l *glogger) Fatal(depth int, args ...interface{}) {
+	glog.FatalDepth(depth+1, args...)
+}
+
+var Logger = new(glogger)
 
 func Verbose(args ...interface{}) {
 	if Logger != nil {

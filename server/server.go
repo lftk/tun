@@ -21,7 +21,7 @@ type Server struct {
 	errc         chan error
 }
 
-type AuthFunc func(name, token, desc string) error
+type AuthFunc func(name, token string) error
 
 func Listen(addr, httpAddr string, auth AuthFunc) (s *Server, err error) {
 	var l, h net.Listener
@@ -118,15 +118,10 @@ func (s *Server) Run(ctx context.Context) (err error) {
 		}
 	}()
 
-	for l, cc := range map[net.Listener]chan net.Conn{
-		s.listener:     s.connc,
-		s.httpListener: s.httpConnc,
-	} {
-		if l != nil {
-			go s.listen(ctx, l, cc)
-		}
+	go s.listen(ctx, s.listener, s.connc)
+	if s.httpListener != nil {
+		go s.listen(ctx, s.httpListener, s.httpConnc)
 	}
-
 	go func() {
 		err := s.service.Serve(ctx)
 		if err != nil {
@@ -166,21 +161,23 @@ func (s *Server) listen(ctx context.Context, l net.Listener, connc chan<- net.Co
 	}
 }
 
-func (s *Server) handleConn(ctx context.Context, c net.Conn) {
+func (s *Server) handleConn(ctx context.Context, conn net.Conn) {
 	select {
 	case <-ctx.Done():
 	default:
-		(&session{
-			Server: s,
-			Conn:   c,
-		}).LoopMessage(ctx)
+		sess, err := newSession(s, conn)
+		if err != nil {
+			conn.Close()
+		} else {
+			sess.Run(ctx)
+		}
 	}
 }
 
-func (s *Server) handleHttpConn(ctx context.Context, c net.Conn) {
+func (s *Server) handleHttpConn(ctx context.Context, conn net.Conn) {
 	select {
 	case <-ctx.Done():
 	default:
-		s.muxer.Handle(c)
+		s.muxer.Handle(conn)
 	}
 }
