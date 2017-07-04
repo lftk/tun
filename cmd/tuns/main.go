@@ -17,31 +17,41 @@ type tunServer struct {
 
 func Listen(addr, httpAddr string) (s *tunServer, err error) {
 	s = new(tunServer)
-	svr, err := server.Listen(addr, httpAddr, s.Auth)
+	svr, err := server.Listen(&server.Config{
+		Addr:     addr,
+		AddrHTTP: httpAddr,
+		Auth:     s.Auth,
+		Load:     s.Load,
+		TraffIn:  s.TraffIn,
+		TraffOut: s.TraffOut,
+	})
 	if err != nil {
 		return
 	}
 
-	svr.Traffic(s)
 	s.Server = svr
 	return
 }
 
 func (s *tunServer) Auth(name, token string) (err error) {
+	return
+}
+
+func (s *tunServer) Load(loader *server.Loader, name string) (err error) {
 	if name == "ssh" {
-		err = s.Server.ProxyTCP(name, 6060)
+		err = loader.ProxyTCP(name, 6060)
 	} else {
-		err = s.Server.ProxyHTTP(name, name)
+		err = loader.ProxyHTTP(name, name)
 	}
 	return
 }
 
-func (s *tunServer) In(name string, b []byte) {
-	//fmt.Println("in", name, string(b[:n]))
+func (s *tunServer) TraffIn(name string, b []byte) {
+	log.Infof("[IN] %s %d", name, len(b))
 }
 
-func (s *tunServer) Out(name string, b []byte) {
-	//fmt.Println("out", name, string(b[:n]))
+func (s *tunServer) TraffOut(name string, b []byte) {
+	log.Infof("[OUT] %s %d", name, len(b))
 }
 
 var (

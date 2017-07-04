@@ -106,7 +106,7 @@ type trafficConn struct {
 
 func (tc trafficConn) Read(b []byte) (n int, err error) {
 	n, err = tc.Conn.Read(b)
-	if tc.Traffic != nil {
+	if tc.Traffic != nil && n > 0 {
 		tc.Traffic.In(tc.name, b[:n])
 	}
 	return
@@ -114,7 +114,7 @@ func (tc trafficConn) Read(b []byte) (n int, err error) {
 
 func (tc trafficConn) Write(b []byte) (n int, err error) {
 	n, err = tc.Conn.Write(b)
-	if tc.Traffic != nil {
+	if tc.Traffic != nil && n > 0 {
 		tc.Traffic.Out(tc.name, b[:n])
 	}
 	return

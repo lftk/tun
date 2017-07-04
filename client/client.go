@@ -7,12 +7,13 @@ import (
 	"os"
 	"runtime"
 
+	"github.com/golang/sync/syncmap"
+
 	"github.com/4396/tun/fake"
 	"github.com/4396/tun/msg"
 	"github.com/4396/tun/mux"
 	"github.com/4396/tun/proxy"
 	"github.com/4396/tun/version"
-	"github.com/golang/sync/syncmap"
 )
 
 var (
@@ -110,6 +111,9 @@ func (c *Client) Run(ctx context.Context) (err error) {
 	defer func() {
 		cancel()
 
+		c.cmd.Close()
+		c.session.Close()
+
 		close(connc)
 		for conn := range connc {
 			conn.Close()
@@ -174,11 +178,5 @@ func (c *Client) handleConn(conn net.Conn) {
 	val, ok := c.listeners.Load(worker.Name)
 	if ok {
 		err = val.(*fake.Listener).Put(conn)
-	}
-}
-
-func (c *Client) ctxFunc(ctx context.Context, f func(context.Context) error) {
-	if err := f(ctx); err != nil {
-		c.errc <- err
 	}
 }

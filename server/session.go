@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"net"
 
 	"github.com/4396/tun/msg"
@@ -38,6 +39,7 @@ func newSession(s *Server, conn net.Conn) (sess *session, err error) {
 
 func (s *session) Run(ctx context.Context) (err error) {
 	defer func() {
+		s.cmd.Close()
 		s.Session.Close()
 		for _, proxy := range s.proxies {
 			s.Server.Kill(proxy)
@@ -87,6 +89,15 @@ func (s *session) handleProxy(proxy *msg.Proxy) (err error) {
 	err = version.CompatClient(proxy.Version)
 	if err != nil {
 		return
+	}
+
+	_, ok := s.Server.service.Load(proxy.Name)
+	if !ok {
+		if s.Server.load != nil {
+			err = s.Server.load(&s.Server.loader, proxy.Name)
+		} else {
+			err = errors.New("Not exists proxy")
+		}
 	}
 
 	if s.Server.auth != nil {

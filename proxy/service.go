@@ -85,6 +85,14 @@ func (s *Service) Proxies() (proxies []Proxy) {
 	return
 }
 
+func (s *Service) Load(name string) (p Proxy, ok bool) {
+	val, ok := s.proxies.Load(name)
+	if ok {
+		p = val.(Proxy)
+	}
+	return
+}
+
 func (s *Service) Kill(name string) (p Proxy) {
 	val, ok := s.proxies.Load(name)
 	if ok {

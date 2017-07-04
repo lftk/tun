@@ -2,10 +2,8 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"net"
 
-	"github.com/4396/tun/fake"
 	"github.com/4396/tun/proxy"
 	"github.com/4396/tun/vhost"
 )
@@ -14,22 +12,35 @@ type Server struct {
 	listener     net.Listener
 	httpListener net.Listener
 	auth         AuthFunc
+	load         LoadFunc
+	loader       Loader
 	muxer        vhost.Muxer
 	service      proxy.Service
 	errc         chan error
 }
 
 type AuthFunc func(name, token string) error
+type LoadFunc func(loader *Loader, name string) error
+type TraffFunc func(name string, b []byte)
 
-func Listen(addr, httpAddr string, auth AuthFunc) (s *Server, err error) {
+type Config struct {
+	Addr     string
+	AddrHTTP string
+	Auth     AuthFunc
+	Load     LoadFunc
+	TraffIn  TraffFunc
+	TraffOut TraffFunc
+}
+
+func Listen(cfg *Config) (s *Server, err error) {
 	var l, h net.Listener
-	l, err = net.Listen("tcp", addr)
+	l, err = net.Listen("tcp", cfg.Addr)
 	if err != nil {
 		return
 	}
 
-	if httpAddr != "" {
-		h, err = net.Listen("tcp", httpAddr)
+	if cfg.AddrHTTP != "" {
+		h, err = net.Listen("tcp", cfg.AddrHTTP)
 		if err != nil {
 			l.Close()
 			return
@@ -39,46 +50,16 @@ func Listen(addr, httpAddr string, auth AuthFunc) (s *Server, err error) {
 	s = &Server{
 		listener:     l,
 		httpListener: h,
-		auth:         auth,
+		auth:         cfg.Auth,
+		load:         cfg.Load,
 		errc:         make(chan error, 1),
 	}
-	return
-}
-
-func (s *Server) ProxyTCP(name string, port int) (err error) {
-	addr := fmt.Sprintf(":%d", port)
-	l, err := net.Listen("tcp", addr)
-	if err != nil {
-		return
-	}
-
-	p := proxy.Wrap(name, l)
-	err = s.Proxy(p)
-	if err != nil {
-		l.Close()
+	s.loader.server = s
+	s.service.Traff = &traffic{
+		TraffIn:  cfg.TraffIn,
+		TraffOut: cfg.TraffOut,
 	}
 	return
-}
-
-type httpProxy struct {
-	proxy.Proxy
-	domain string
-}
-
-func (s *Server) ProxyHTTP(name, domain string) (err error) {
-	l := fake.NewListener()
-	p := proxy.Wrap(name, l)
-	err = s.Proxy(httpProxy{p, domain})
-	if err != nil {
-		return
-	}
-
-	s.muxer.HandleFunc(domain, l.Put)
-	return
-}
-
-func (s *Server) Proxy(p proxy.Proxy) error {
-	return s.service.Proxy(p)
 }
 
 func (s *Server) Proxies() []proxy.Proxy {
@@ -91,10 +72,6 @@ func (s *Server) Kill(name string) {
 	if ok {
 		s.muxer.HandleFunc(hp.domain, nil)
 	}
-}
-
-func (s *Server) Traffic(traff proxy.Traffic) {
-	s.service.Traff = traff
 }
 
 func (s *Server) Run(ctx context.Context) (err error) {
