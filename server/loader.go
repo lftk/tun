@@ -14,15 +14,15 @@ type Loader struct {
 
 func (l *Loader) ProxyTCP(name string, port int) (err error) {
 	addr := fmt.Sprintf(":%d", port)
-	lsn, err := net.Listen("tcp", addr)
+	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return
 	}
 
-	p := proxy.Wrap(name, lsn)
+	p := proxy.Wrap(name, ln)
 	err = l.Proxy(p)
 	if err != nil {
-		lsn.Close()
+		ln.Close()
 	}
 	return
 }
@@ -33,15 +33,15 @@ type httpProxy struct {
 }
 
 func (l *Loader) ProxyHTTP(name, domain string) (err error) {
-	lsn := fake.NewListener()
-	p := proxy.Wrap(name, lsn)
+	ln := fake.NewListener()
+	p := proxy.Wrap(name, ln)
 	err = l.Proxy(httpProxy{p, domain})
 	if err != nil {
-		lsn.Close()
+		ln.Close()
 		return
 	}
 
-	l.server.muxer.HandleFunc(domain, lsn.Put)
+	l.server.muxer.HandleFunc(domain, ln.Put)
 	return
 }
 

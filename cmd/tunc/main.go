@@ -14,6 +14,14 @@ import (
 	"github.com/4396/tun/version"
 )
 
+var (
+	conf   = flag.String("c", "conf/tunc.yaml", "config file's path")
+	server = flag.String("server", "", "tun server addr")
+	name   = flag.String("name", "", "tun proxy name")
+	token  = flag.String("token", "", "tun proxy token")
+	addr   = flag.String("addr", "", "tun proxy addr")
+)
+
 type proxy struct {
 	Addr  string
 	Token string
@@ -24,20 +32,16 @@ type config struct {
 	Proxies map[string]proxy
 }
 
-func loadConfig(path string) (cfg config, err error) {
-	b, err := ioutil.ReadFile(path)
-	if err != nil {
-		return
-	}
-
-	err = yaml.Unmarshal(b, &cfg)
-	return
-}
-
-func LoadConfig() (cfg config, err error) {
+func loadConfig() (cfg config, err error) {
 	_, errSt := os.Stat(*conf)
 	if errSt == nil {
-		cfg, err = loadConfig(*conf)
+		var b []byte
+		b, err = ioutil.ReadFile(*conf)
+		if err != nil {
+			return
+		}
+
+		err = yaml.Unmarshal(b, &cfg)
 		if err != nil {
 			return
 		}
@@ -59,19 +63,11 @@ func LoadConfig() (cfg config, err error) {
 	return
 }
 
-var (
-	conf   = flag.String("c", "conf/tunc.yaml", "config file's path")
-	server = flag.String("server", "", "tun server addr")
-	name   = flag.String("name", "", "tun proxy name")
-	token  = flag.String("token", "", "tun proxy token")
-	addr   = flag.String("addr", "", "tun proxy addr")
-)
-
 func main() {
 	flag.Parse()
 	log.Infof("Start tun client, version is %s", version.Version)
 
-	cfg, err := LoadConfig()
+	cfg, err := loadConfig()
 	if err != nil {
 		log.Fatalf("Load config failed, %v", err)
 		return
@@ -104,7 +100,7 @@ func main() {
 		err = c.Run(ctx)
 		if err != nil {
 			if err != client.ErrSessionClosed {
-				log.Errorf("c.Run failed, err=%v", err)
+				log.Errorf("Run client failed, err=%v", err)
 				return
 			}
 		}
