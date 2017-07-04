@@ -103,7 +103,7 @@ func main() {
 		idx = 0
 		err = c.Run(ctx)
 		if err != nil {
-			if err != client.ErrDialerClosed {
+			if err != client.ErrSessionClosed {
 				log.Errorf("c.Run failed, err=%v", err)
 				return
 			}

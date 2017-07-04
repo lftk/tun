@@ -17,8 +17,8 @@ import (
 )
 
 var (
-	ErrDialerClosed  = errors.New("Dialer closed")
-	ErrUnexpectedMsg = errors.New("Unexpected response")
+	ErrSessionClosed = errors.New("session closed")
+	ErrUnexpectedMsg = errors.New("unexpected message")
 )
 
 type Client struct {
@@ -145,7 +145,7 @@ func (c *Client) listen(ctx context.Context, connc chan<- net.Conn) {
 	for {
 		conn, err := c.session.AcceptConn()
 		if err != nil {
-			c.errc <- ErrDialerClosed
+			c.errc <- ErrSessionClosed
 			return
 		}
 
