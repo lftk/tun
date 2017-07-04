@@ -3,67 +3,54 @@ package main
 import (
 	"context"
 	"flag"
+	"io/ioutil"
 	"time"
 
-	"gopkg.in/ini.v1"
+	"gopkg.in/yaml.v2"
 
 	"github.com/4396/tun/client"
 	"github.com/4396/tun/log"
 	"github.com/4396/tun/version"
 )
 
-type tunClient struct {
-	*client.Client
+type config struct {
+	Server  string
+	Proxies map[string]struct {
+		Addr  string
+		Token string
+	}
 }
 
-func Dial(addr string) (c *tunClient, err error) {
-	cli, err := client.Dial(addr)
+func loadConfig(path string) (cfg config, err error) {
+	b, err := ioutil.ReadFile(path)
 	if err != nil {
 		return
 	}
 
-	c = &tunClient{Client: cli}
-	return
-}
-
-func (c *tunClient) LoadProxy(cfg *ini.File) (err error) {
-	for _, sec := range cfg.Sections() {
-		name := sec.Name()
-		if name == "DEFAULT" || name == "common" {
-			continue
-		}
-
-		token := sec.Key("token").String()
-		addr := sec.Key("addr").String()
-		err = c.Proxy(name, token, addr)
-		if err != nil {
-			return
-		}
-	}
+	err = yaml.Unmarshal(b, &cfg)
 	return
 }
 
 var (
-	conf = flag.String("c", "conf/tunc.ini", "config file's path")
+	conf = flag.String("c", "conf/tunc.yaml", "config file's path")
 )
 
 func main() {
 	flag.Parse()
 	log.Infof("Start tun client, version is %s", version.Version)
 
-	cfg, err := ini.InsensitiveLoad(*conf)
+	cfg, err := loadConfig(*conf)
 	if err != nil {
-		log.Fatalf("Load config file failed, err=%v", err)
+		log.Fatalf("Load config failed, %v", err)
 		return
 	}
 
 	var (
-		idx  int64
-		ctx  = context.Background()
-		addr = cfg.Section("common").Key("addr").String()
+		idx int64
+		ctx = context.Background()
 	)
 	for {
-		c, err := Dial(addr)
+		c, err := client.Dial(cfg.Server)
 		if err != nil {
 			idx++
 			time.Sleep(time.Second)
@@ -72,10 +59,13 @@ func main() {
 		}
 		log.Info("Connect tun server success")
 
-		err = c.LoadProxy(cfg)
-		if err != nil {
-			log.Fatalf("Load proxy failed, err=%v", err)
-			return
+		for name, proxy := range cfg.Proxies {
+			err = c.Proxy(name, proxy.Token, proxy.Addr)
+			if err != nil {
+				log.Fatalf("Load [%s] failed, %v", name, err)
+				return
+			}
+			log.Infof("Load [%s] success", name)
 		}
 
 		idx = 0
