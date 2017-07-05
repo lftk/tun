@@ -33,7 +33,7 @@ type httpProxy struct {
 }
 
 func (l *Loader) ProxyHTTP(name, domain string) (err error) {
-	ln := fake.NewListener()
+	ln := &fake.Listener{}
 	p := proxy.Wrap(name, ln)
 	err = l.Proxy(httpProxy{p, domain})
 	if err != nil {
