@@ -7,48 +7,36 @@ import (
 	"sync"
 )
 
-func Wrap(name string, l net.Listener) Proxy {
+func Wrap(name string, listener net.Listener) Proxy {
 	return &proxy{
-		Listener: l,
 		name:     name,
+		listener: listener,
 	}
 }
 
 type proxy struct {
-	net.Listener
-	name   string
-	closed bool
-	mu     sync.RWMutex
-	dialer Dialer
+	name     string
+	dialer   Dialer
+	mu       sync.RWMutex
+	listener net.Listener
 }
 
 func (p *proxy) Name() string {
 	return p.name
 }
 
-func (p *proxy) Close() (err error) {
-	p.closed = true
-	err = p.Listener.Close()
-	if err != nil {
-		return
-	}
-
-	p.mu.RLock()
+func (p *proxy) Close() error {
+	p.listener.Close()
+	p.mu.Lock()
 	if p.dialer != nil {
-		err = p.dialer.Close()
+		p.dialer.Close()
 	}
-	p.mu.RUnlock()
-	return
+	p.mu.Unlock()
+	return nil
 }
 
 func (p *proxy) Accept() (net.Conn, error) {
-	conn, err := p.Listener.Accept()
-	if err != nil {
-		if p.closed {
-			err = ErrClosed
-		}
-	}
-	return conn, err
+	return p.listener.Accept()
 }
 
 func (p *proxy) Bind(dialer Dialer) (err error) {
@@ -56,12 +44,12 @@ func (p *proxy) Bind(dialer Dialer) (err error) {
 	defer p.mu.Unlock()
 
 	if p.dialer != nil {
-		err = errors.New("Exists dialer")
+		err = errors.New("exists dialer")
 		return
 	}
 
 	p.dialer = dialer
-	return nil
+	return
 }
 
 func (p *proxy) Unbind(dialer Dialer) (err error) {
@@ -81,11 +69,11 @@ func (p *proxy) Handle(conn net.Conn, traff Traffic) (err error) {
 	dialer = p.dialer
 	p.mu.RUnlock()
 	if dialer == nil {
-		err = errors.New("Not bind dialer")
+		err = errors.New("not bind dialer")
 		return
 	}
 
-	work, err := dialer.Dial()
+	worker, err := dialer.Dial()
 	if err != nil {
 		return
 	}
@@ -94,7 +82,7 @@ func (p *proxy) Handle(conn net.Conn, traff Traffic) (err error) {
 		name:    p.name,
 		Conn:    conn,
 		Traffic: traff,
-	}.Join(work)
+	}.Join(worker)
 	return
 }
 
@@ -120,7 +108,7 @@ func (tc trafficConn) Write(b []byte) (n int, err error) {
 	return
 }
 
-func (tc trafficConn) Join(work net.Conn) {
+func (tc trafficConn) Join(conn net.Conn) {
 	var wg sync.WaitGroup
 	pipe := func(from, to net.Conn) {
 		defer func() {
@@ -132,7 +120,7 @@ func (tc trafficConn) Join(work net.Conn) {
 		return
 	}
 	wg.Add(2)
-	go pipe(tc, work)
-	go pipe(work, tc)
+	go pipe(tc, conn)
+	go pipe(conn, tc)
 	wg.Wait()
 }

@@ -1,12 +1,7 @@
 package proxy
 
 import (
-	"errors"
 	"net"
-)
-
-var (
-	ErrClosed = errors.New("Proxy closed")
 )
 
 type Traffic interface {

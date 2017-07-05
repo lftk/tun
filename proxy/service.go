@@ -3,7 +3,6 @@ package proxy
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net"
 
 	"github.com/golang/sync/syncmap"
@@ -127,9 +126,6 @@ func (s *Service) listenProxy(ctx context.Context, p Proxy) {
 	for {
 		conn, err := p.Accept()
 		if err != nil {
-			if err != ErrClosed {
-				s.errc <- err
-			}
 			return
 		}
 
@@ -148,7 +144,6 @@ func (s *Service) handleConn(ctx context.Context, pc proxyConn) {
 	default:
 		err := pc.Proxy.Handle(pc.Conn, s.Traff)
 		if err != nil {
-			fmt.Println(err)
 			pc.Conn.Close()
 		}
 	}
