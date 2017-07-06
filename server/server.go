@@ -13,15 +13,15 @@ type Server struct {
 	httpListener net.Listener
 	auth         AuthFunc
 	load         LoadFunc
-	loader       Loader
 	muxer        vhost.Muxer
 	service      proxy.Service
 	errc         chan error
+	loader       loader
 }
 
-type AuthFunc func(name, token string) error
-type LoadFunc func(loader *Loader, name string) error
 type TraffFunc func(name string, b []byte)
+type AuthFunc func(name, token string) error
+type LoadFunc func(loader Loader, name string) error
 
 type Config struct {
 	Addr     string
@@ -54,7 +54,7 @@ func Listen(cfg *Config) (s *Server, err error) {
 		load:         cfg.Load,
 		errc:         make(chan error, 1),
 	}
-	s.loader.server = s
+	s.loader.Server = s
 	s.service.Traff = &traffic{
 		TraffIn:  cfg.TraffIn,
 		TraffOut: cfg.TraffOut,
@@ -72,6 +72,10 @@ func (s *Server) Kill(name string) {
 	if ok {
 		s.muxer.HandleFunc(hp.domain, nil)
 	}
+}
+
+func (s *Server) proxy(p proxy.Proxy) error {
+	return s.service.Proxy(p)
 }
 
 func (s *Server) Run(ctx context.Context) (err error) {

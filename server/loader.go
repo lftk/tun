@@ -8,11 +8,17 @@ import (
 	"github.com/4396/tun/proxy"
 )
 
-type Loader struct {
-	server *Server
+type Loader interface {
+	ProxyTCP(name string, port int) error
+	ProxyHTTP(name, domain string) error
+	Proxy(proxy.Proxy) error
 }
 
-func (l *Loader) ProxyTCP(name string, port int) (err error) {
+type loader struct {
+	*Server
+}
+
+func (l *loader) ProxyTCP(name string, port int) (err error) {
 	addr := fmt.Sprintf(":%d", port)
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -32,7 +38,7 @@ type httpProxy struct {
 	domain string
 }
 
-func (l *Loader) ProxyHTTP(name, domain string) (err error) {
+func (l *loader) ProxyHTTP(name, domain string) (err error) {
 	ln := &fake.Listener{}
 	p := proxy.Wrap(name, ln)
 	err = l.Proxy(httpProxy{p, domain})
@@ -41,10 +47,10 @@ func (l *Loader) ProxyHTTP(name, domain string) (err error) {
 		return
 	}
 
-	l.server.muxer.HandleFunc(domain, ln.Put)
+	l.muxer.HandleFunc(domain, ln.Put)
 	return
 }
 
-func (l *Loader) Proxy(p proxy.Proxy) error {
-	return l.server.service.Proxy(p)
+func (l *loader) Proxy(p proxy.Proxy) error {
+	return l.service.Proxy(p)
 }

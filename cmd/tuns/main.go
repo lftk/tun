@@ -36,7 +36,7 @@ func (s *tunServer) Auth(name, token string) (err error) {
 	return
 }
 
-func (s *tunServer) Load(loader *server.Loader, name string) (err error) {
+func (s *tunServer) Load(loader server.Loader, name string) (err error) {
 	if name == "ssh" {
 		err = loader.ProxyTCP(name, 6060)
 	} else {
