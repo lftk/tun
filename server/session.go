@@ -91,19 +91,19 @@ func (s *session) handleProxy(proxy *msg.Proxy) (err error) {
 		return
 	}
 
-	_, ok := s.Server.service.Load(proxy.Name)
-	if !ok {
-		if s.Server.load != nil {
-			err = s.Server.load(&s.Server.loader, proxy.Name)
-		} else {
-			err = errors.New("Not exists proxy")
-		}
-	}
-
 	if s.Server.auth != nil {
 		err = s.Server.auth(proxy.Name, proxy.Token)
 		if err != nil {
 			return
+		}
+	}
+
+	_, ok := s.Server.service.Load(proxy.Name)
+	if !ok {
+		if s.Server.load != nil {
+			err = s.Server.load(&loader{s.Server}, proxy.Name)
+		} else {
+			err = errors.New("Not exists proxy")
 		}
 	}
 

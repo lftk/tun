@@ -16,7 +16,6 @@ type Server struct {
 	muxer        vhost.Muxer
 	service      proxy.Service
 	errc         chan error
-	loader       loader
 }
 
 type TraffFunc func(name string, b []byte)
@@ -54,7 +53,6 @@ func Listen(cfg *Config) (s *Server, err error) {
 		load:         cfg.Load,
 		errc:         make(chan error, 1),
 	}
-	s.loader.Server = s
 	s.service.Traff = &traffic{
 		TraffIn:  cfg.TraffIn,
 		TraffOut: cfg.TraffOut,
