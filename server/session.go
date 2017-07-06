@@ -1,9 +1,11 @@
 package server
 
 import (
+	"container/list"
 	"context"
 	"errors"
 	"net"
+	"sync"
 
 	"github.com/4396/tun/msg"
 	"github.com/4396/tun/mux"
@@ -11,10 +13,11 @@ import (
 )
 
 type session struct {
-	*Server
-	*mux.Session
+	server  *Server
+	session *mux.Session
 	cmd     net.Conn
-	proxies []string
+	proxies *list.List
+	locker  sync.Mutex
 }
 
 func newSession(s *Server, conn net.Conn) (sess *session, err error) {
@@ -30,20 +33,48 @@ func newSession(s *Server, conn net.Conn) (sess *session, err error) {
 	}
 
 	sess = &session{
-		Server:  s,
-		Session: ms,
+		server:  s,
+		session: ms,
 		cmd:     cmd,
+		proxies: list.New(),
 	}
 	return
+}
+
+func (s *session) Kill(name string) (ok bool) {
+	s.locker.Lock()
+	defer s.locker.Unlock()
+
+	for e := s.proxies.Front(); e != nil; e = e.Next() {
+		if e.Value.(string) == name {
+			s.proxies.Remove(e)
+			s.kill(name)
+			ok = true
+			return
+		}
+	}
+	return
+}
+
+func (s *session) kill(name string) {
+	p := s.server.service.Kill(name)
+	hp, ok := p.(httpProxy)
+	if ok {
+		s.server.muxer.HandleFunc(hp.domain, nil)
+	}
 }
 
 func (s *session) Run(ctx context.Context) (err error) {
 	defer func() {
 		s.cmd.Close()
-		s.Session.Close()
-		for _, proxy := range s.proxies {
-			s.Server.Kill(proxy)
+		s.session.Close()
+
+		s.locker.Lock()
+		for e := s.proxies.Front(); e != nil; e = e.Next() {
+			s.kill(e.Value.(string))
 		}
+		s.proxies.Init()
+		s.locker.Unlock()
 	}()
 
 	for {
@@ -79,9 +110,11 @@ func (s *session) handleProxy(proxy *msg.Proxy) (err error) {
 		} else {
 			err = msg.Write(s.cmd, &msg.Version{Version: version.Version})
 			if err != nil {
-				s.Server.Kill(proxy.Name)
+				s.kill(proxy.Name)
 			} else {
-				s.proxies = append(s.proxies, proxy.Name)
+				s.locker.Lock()
+				s.proxies.PushBack(proxy.Name)
+				s.locker.Unlock()
 			}
 		}
 	}()
@@ -91,26 +124,26 @@ func (s *session) handleProxy(proxy *msg.Proxy) (err error) {
 		return
 	}
 
-	if s.Server.auth != nil {
-		err = s.Server.auth(proxy.Name, proxy.Token)
+	if s.server.auth != nil {
+		err = s.server.auth(proxy.Name, proxy.Token)
 		if err != nil {
 			return
 		}
 	}
 
-	_, ok := s.Server.service.Load(proxy.Name)
+	_, ok := s.server.service.Load(proxy.Name)
 	if !ok {
-		if s.Server.load != nil {
-			err = s.Server.load(&loader{s.Server}, proxy.Name)
+		if s.server.load != nil {
+			err = s.server.load(&loader{s.server}, proxy.Name)
 		} else {
 			err = errors.New("Not exists proxy")
 		}
 	}
 
 	d := &dialer{
-		Session: s.Session,
+		Session: s.session,
 		Name:    proxy.Name,
 	}
-	err = s.Server.service.Register(proxy.Name, d)
+	err = s.server.service.Register(proxy.Name, d)
 	return
 }

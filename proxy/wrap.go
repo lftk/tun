@@ -17,7 +17,7 @@ func Wrap(name string, listener net.Listener) Proxy {
 type proxy struct {
 	name     string
 	dialer   Dialer
-	mu       sync.RWMutex
+	locker   sync.RWMutex
 	listener net.Listener
 }
 
@@ -27,11 +27,11 @@ func (p *proxy) Name() string {
 
 func (p *proxy) Close() error {
 	p.listener.Close()
-	p.mu.Lock()
+	p.locker.Lock()
 	if p.dialer != nil {
 		p.dialer.Close()
 	}
-	p.mu.Unlock()
+	p.locker.Unlock()
 	return nil
 }
 
@@ -40,8 +40,8 @@ func (p *proxy) Accept() (net.Conn, error) {
 }
 
 func (p *proxy) Bind(dialer Dialer) (err error) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+	p.locker.Lock()
+	defer p.locker.Unlock()
 
 	if p.dialer != nil {
 		err = errors.New("exists dialer")
@@ -53,8 +53,8 @@ func (p *proxy) Bind(dialer Dialer) (err error) {
 }
 
 func (p *proxy) Unbind(dialer Dialer) (err error) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
+	p.locker.Lock()
+	defer p.locker.Unlock()
 
 	if p.dialer == dialer {
 		p.dialer = nil
@@ -65,9 +65,9 @@ func (p *proxy) Unbind(dialer Dialer) (err error) {
 
 func (p *proxy) Handle(conn net.Conn, traff Traffic) (err error) {
 	var dialer Dialer
-	p.mu.RLock()
+	p.locker.RLock()
 	dialer = p.dialer
-	p.mu.RUnlock()
+	p.locker.RUnlock()
 	if dialer == nil {
 		err = errors.New("not bind dialer")
 		return

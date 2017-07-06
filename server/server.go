@@ -4,6 +4,8 @@ import (
 	"context"
 	"net"
 
+	"github.com/golang/sync/syncmap"
+
 	"github.com/4396/tun/proxy"
 	"github.com/4396/tun/vhost"
 )
@@ -16,11 +18,14 @@ type Server struct {
 	muxer        vhost.Muxer
 	service      proxy.Service
 	errc         chan error
+	sessions     syncmap.Map
 }
 
-type TraffFunc func(name string, b []byte)
-type AuthFunc func(name, token string) error
-type LoadFunc func(loader Loader, name string) error
+type (
+	TraffFunc func(name string, b []byte)
+	AuthFunc  func(name, token string) error
+	LoadFunc  func(loader Loader, name string) error
+)
 
 type Config struct {
 	Addr     string
@@ -65,15 +70,9 @@ func (s *Server) Proxies() []proxy.Proxy {
 }
 
 func (s *Server) Kill(name string) {
-	p := s.service.Kill(name)
-	hp, ok := p.(httpProxy)
-	if ok {
-		s.muxer.HandleFunc(hp.domain, nil)
-	}
-}
-
-func (s *Server) proxy(p proxy.Proxy) error {
-	return s.service.Proxy(p)
+	s.sessions.Range(func(key, val interface{}) bool {
+		return !val.(*session).Kill(name)
+	})
 }
 
 func (s *Server) Run(ctx context.Context) (err error) {
@@ -146,6 +145,9 @@ func (s *Server) handleConn(ctx context.Context, conn net.Conn) {
 		if err != nil {
 			conn.Close()
 		} else {
+			s.sessions.Store(sess, sess)
+			defer s.sessions.Delete(sess)
+
 			sess.Run(ctx)
 		}
 	}
