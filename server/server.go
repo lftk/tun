@@ -17,8 +17,8 @@ type Server struct {
 	load         LoadFunc
 	muxer        vhost.Muxer
 	service      proxy.Service
-	errc         chan error
 	sessions     syncmap.Map
+	errc         chan error
 }
 
 type (

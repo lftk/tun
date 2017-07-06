@@ -13,14 +13,24 @@ import (
 )
 
 type Muxer struct {
-	handler syncmap.Map
+	handlers syncmap.Map
 }
 
-func (m *Muxer) HandleFunc(domain string, handle func(net.Conn) error) {
-	if handle != nil {
-		m.handler.Store(domain, handle)
+type HandlerFunc func(net.Conn) error
+
+func (m *Muxer) Handler(domain string) (handler HandlerFunc) {
+	val, ok := m.handlers.Load(domain)
+	if ok {
+		handler = val.(HandlerFunc)
+	}
+	return
+}
+
+func (m *Muxer) HandleFunc(domain string, handler HandlerFunc) {
+	if handler != nil {
+		m.handlers.Store(domain, handler)
 	} else {
-		m.handler.Delete(domain)
+		m.handlers.Delete(domain)
 	}
 }
 
@@ -33,7 +43,7 @@ func (m *Muxer) Handle(c net.Conn) {
 		return
 	}
 
-	val, ok := m.handler.Load(domain)
+	val, ok := m.handlers.Load(domain)
 	if !ok {
 		// 400
 		fmt.Println("400")

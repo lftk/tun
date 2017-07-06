@@ -39,6 +39,12 @@ type httpProxy struct {
 }
 
 func (l *loader) ProxyHTTP(name, domain string) (err error) {
+	h := l.muxer.Handler(domain)
+	if h != nil {
+		// err =
+		return
+	}
+
 	ln := &fake.Listener{}
 	p := proxy.Wrap(name, ln)
 	err = l.Proxy(httpProxy{p, domain})
