@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/4396/tun/fake"
 	"github.com/4396/tun/proxy"
 )
 
@@ -39,21 +38,16 @@ type httpProxy struct {
 }
 
 func (l *loader) ProxyHTTP(name, domain string) (err error) {
-	h := l.muxer.Handler(domain)
-	if h != nil {
-		// err =
+	ln, err := l.muxer.Listen(domain)
+	if err != nil {
 		return
 	}
 
-	ln := &fake.Listener{}
 	p := proxy.Wrap(name, ln)
-	err = l.Proxy(httpProxy{p, domain})
+	err = l.Proxy(p)
 	if err != nil {
 		ln.Close()
-		return
 	}
-
-	l.muxer.HandleFunc(domain, ln.Put)
 	return
 }
 

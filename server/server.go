@@ -11,14 +11,14 @@ import (
 )
 
 type Server struct {
-	listener     net.Listener
-	httpListener net.Listener
-	auth         AuthFunc
-	load         LoadFunc
-	muxer        vhost.Muxer
-	service      proxy.Service
-	sessions     syncmap.Map
-	errc         chan error
+	listener net.Listener
+	connc    chan net.Conn
+	muxer    *vhost.Muxer
+	auth     AuthFunc
+	load     LoadFunc
+	service  proxy.Service
+	sessions syncmap.Map
+	errc     chan error
 }
 
 type (
@@ -37,26 +37,29 @@ type Config struct {
 }
 
 func Listen(cfg *Config) (s *Server, err error) {
-	var l, h net.Listener
-	l, err = net.Listen("tcp", cfg.Addr)
+	var (
+		listener net.Listener
+		muxer    *vhost.Muxer
+	)
+
+	listener, err = net.Listen("tcp", cfg.Addr)
 	if err != nil {
 		return
 	}
 
 	if cfg.AddrHTTP != "" {
-		h, err = net.Listen("tcp", cfg.AddrHTTP)
+		muxer, err = vhost.Listen(cfg.AddrHTTP)
 		if err != nil {
-			l.Close()
 			return
 		}
 	}
 
 	s = &Server{
-		listener:     l,
-		httpListener: h,
-		auth:         cfg.Auth,
-		load:         cfg.Load,
-		errc:         make(chan error, 1),
+		listener: listener,
+		muxer:    muxer,
+		auth:     cfg.Auth,
+		load:     cfg.Load,
+		errc:     make(chan error, 1),
 	}
 	s.service.Traff = &traffic{
 		TraffIn:  cfg.TraffIn,
@@ -76,65 +79,59 @@ func (s *Server) Kill(name string) {
 }
 
 func (s *Server) Run(ctx context.Context) (err error) {
-	connc := make(chan net.Conn, 16)
-	httpConnc := make(chan net.Conn, 16)
+	s.connc = make(chan net.Conn, 16)
 	ctx, cancel := context.WithCancel(ctx)
 	defer func() {
 		cancel()
 
-		close(connc)
-		for conn := range connc {
-			conn.Close()
-		}
-
-		close(httpConnc)
-		for conn := range httpConnc {
+		close(s.connc)
+		for conn := range s.connc {
 			conn.Close()
 		}
 	}()
 
-	go s.listen(ctx, s.listener, connc)
-	if s.httpListener != nil {
-		go s.listen(ctx, s.httpListener, httpConnc)
-	}
-
-	go func() {
-		err := s.service.Serve(ctx)
-		if err != nil {
-			s.errc <- err
-		}
-	}()
+	s.ctxDo(ctx, s.listen)
+	s.ctxDo(ctx, s.muxer.Serve)
+	s.ctxDo(ctx, s.service.Serve)
 
 	for {
 		select {
-		case c := <-connc:
+		case c := <-s.connc:
 			go s.handleConn(ctx, c)
-		case c := <-httpConnc:
-			go s.handleHttpConn(ctx, c)
-		case err = <-s.errc:
-			return
 		case <-ctx.Done():
+			err = ctx.Err()
+			return
+		case err = <-s.errc:
 			return
 		}
 	}
 }
 
-func (s *Server) listen(ctx context.Context, l net.Listener, connc chan<- net.Conn) {
-	defer l.Close()
+func (s *Server) listen(ctx context.Context) (err error) {
+	defer s.listener.Close()
 	for {
-		conn, err := l.Accept()
+		var conn net.Conn
+		conn, err = s.listener.Accept()
 		if err != nil {
-			s.errc <- err
 			return
 		}
 
 		select {
 		case <-ctx.Done():
+			err = ctx.Err()
 			return
 		default:
-			connc <- conn
+			s.connc <- conn
 		}
 	}
+}
+
+func (s *Server) ctxDo(ctx context.Context, do func(context.Context) error) {
+	go func() {
+		if err := do(ctx); err != nil {
+			s.errc <- err
+		}
+	}()
 }
 
 func (s *Server) handleConn(ctx context.Context, conn net.Conn) {
@@ -150,13 +147,5 @@ func (s *Server) handleConn(ctx context.Context, conn net.Conn) {
 
 			sess.Run(ctx)
 		}
-	}
-}
-
-func (s *Server) handleHttpConn(ctx context.Context, conn net.Conn) {
-	select {
-	case <-ctx.Done():
-	default:
-		s.muxer.Handle(conn)
 	}
 }

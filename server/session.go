@@ -57,11 +57,7 @@ func (s *session) Kill(name string) (ok bool) {
 }
 
 func (s *session) kill(name string) {
-	p := s.server.service.Kill(name)
-	hp, ok := p.(httpProxy)
-	if ok {
-		s.server.muxer.HandleFunc(hp.domain, nil)
-	}
+	s.server.service.Kill(name)
 }
 
 func (s *session) Run(ctx context.Context) (err error) {

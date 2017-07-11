@@ -3,63 +3,79 @@ package vhost
 import (
 	"bufio"
 	"bytes"
-	"fmt"
+	"context"
+	"errors"
 	"io"
 	"net"
 	"net/http"
 	"strings"
 
 	"github.com/golang/sync/syncmap"
+
+	"github.com/4396/tun/fake"
 )
 
 type Muxer struct {
-	handlers syncmap.Map
+	net.Listener
+	listeners syncmap.Map
 }
 
-type HandlerFunc func(net.Conn) error
-
-func (m *Muxer) Handler(domain string) (handler HandlerFunc) {
-	val, ok := m.handlers.Load(domain)
-	if ok {
-		handler = val.(HandlerFunc)
+func Listen(addr string) (m *Muxer, err error) {
+	l, err := net.Listen("tcp", addr)
+	if err != nil {
+		return
 	}
+
+	m = &Muxer{Listener: l}
 	return
 }
 
-func (m *Muxer) HandleFunc(domain string, handler HandlerFunc) {
-	if handler != nil {
-		m.handlers.Store(domain, handler)
-	} else {
-		m.handlers.Delete(domain)
+func (m *Muxer) Listen(domain string) (l net.Listener, err error) {
+	val, loaded := m.listeners.LoadOrStore(domain, &fake.Listener{})
+	if loaded {
+		err = errors.New("")
+		return
+	}
+
+	l = val.(net.Listener)
+	return
+}
+
+func (m *Muxer) Serve(ctx context.Context) (err error) {
+	for {
+		var conn net.Conn
+		conn, err = m.Listener.Accept()
+		if err != nil {
+			return
+		}
+
+		select {
+		case <-ctx.Done():
+			err = ctx.Err()
+			return
+		default:
+			m.handleConn(conn)
+		}
 	}
 }
 
-func (m *Muxer) Handle(c net.Conn) {
-	domain, bc, err := subDomain(c)
+func (m *Muxer) handleConn(conn net.Conn) {
+	domain, cc, err := subDomain(conn)
 	if err != nil {
-		// 500
-		fmt.Println("1-500", err)
-		c.Close()
+		conn.Close()
 		return
 	}
 
-	val, ok := m.handlers.Load(domain)
-	if !ok {
-		// 400
-		fmt.Println("400")
-		bc.Close()
-		return
+	val, ok := m.listeners.Load(domain)
+	if ok {
+		err = val.(*fake.Listener).Put(cc)
+		if err == nil {
+			return
+		}
 	}
 
-	//bc.Close()
-	//return
-
-	err = val.(func(net.Conn) error)(bc)
-	if err != nil {
-		// 500
-		fmt.Println("2-500", err)
-		bc.Close()
-	}
+	// 500
+	conn.Close()
 }
 
 type bufferConn struct {
