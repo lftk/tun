@@ -16,8 +16,8 @@ import (
 )
 
 type Muxer struct {
-	net.Listener
-	listeners syncmap.Map
+	listener net.Listener
+	domains  syncmap.Map
 }
 
 func Listen(addr string) (m *Muxer, err error) {
@@ -26,25 +26,32 @@ func Listen(addr string) (m *Muxer, err error) {
 		return
 	}
 
-	m = &Muxer{Listener: l}
+	m = &Muxer{listener: l}
 	return
 }
 
+func (m *Muxer) Close() error {
+	m.domains.Range(func(key, val interface{}) bool {
+		val.(*fake.Listener).Close()
+		m.domains.Delete(key)
+		return true
+	})
+	return m.listener.Close()
+}
+
 func (m *Muxer) Listen(domain string) (l net.Listener, err error) {
-	val, loaded := m.listeners.LoadOrStore(domain, &fake.Listener{})
+	l = fake.NewListener()
+	_, loaded := m.domains.LoadOrStore(domain, l)
 	if loaded {
 		err = errors.New("")
-		return
 	}
-
-	l = val.(net.Listener)
 	return
 }
 
 func (m *Muxer) Serve(ctx context.Context) (err error) {
+	var conn net.Conn
 	for {
-		var conn net.Conn
-		conn, err = m.Listener.Accept()
+		conn, err = m.listener.Accept()
 		if err != nil {
 			return
 		}
@@ -66,16 +73,18 @@ func (m *Muxer) handleConn(conn net.Conn) {
 		return
 	}
 
-	val, ok := m.listeners.Load(domain)
-	if ok {
-		err = val.(*fake.Listener).Put(cc)
-		if err == nil {
-			return
-		}
+	val, ok := m.domains.Load(domain)
+	if !ok {
+		// 404
+		cc.Close()
+		return
 	}
 
-	// 500
-	conn.Close()
+	err = val.(*fake.Listener).Put(cc)
+	if err != nil {
+		// 500
+		cc.Close()
+	}
 }
 
 type bufferConn struct {

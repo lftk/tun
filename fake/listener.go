@@ -11,16 +11,16 @@ var (
 )
 
 type Listener struct {
-	connc    chan net.Conn
-	once     sync.Once
-	die      chan interface{}
-	dieMutex sync.Mutex
+	connc chan net.Conn
+	die   chan interface{}
+	mu    sync.Mutex
 }
 
-func (l *Listener) lazyInit() {
-	l.once.Do(func() {
-		l.connc = make(chan net.Conn, 16)
-	})
+func NewListener() *Listener {
+	return &Listener{
+		die:   make(chan interface{}),
+		connc: make(chan net.Conn, 16),
+	}
 }
 
 func (l *Listener) Put(conn net.Conn) (err error) {
@@ -28,17 +28,21 @@ func (l *Listener) Put(conn net.Conn) (err error) {
 	case <-l.die:
 		err = ErrClosed
 	default:
-		l.lazyInit()
 		l.connc <- conn
 	}
 	return
 }
 
 func (l *Listener) Accept() (conn net.Conn, err error) {
-	l.lazyInit()
-	conn, ok := <-l.connc
-	if !ok {
-		err = errors.New("Listener closed")
+	select {
+	case <-l.die:
+		err = ErrClosed
+	default:
+		var ok bool
+		conn, ok = <-l.connc
+		if !ok {
+			err = ErrClosed
+		}
 	}
 	return
 }
@@ -48,17 +52,16 @@ func (l *Listener) Addr() net.Addr {
 }
 
 func (l *Listener) Close() (err error) {
-	l.dieMutex.Lock()
+	l.mu.Lock()
 
 	select {
 	case <-l.die:
-		l.dieMutex.Unlock()
+		l.mu.Unlock()
 		err = ErrClosed
 	default:
 		close(l.die)
-		l.dieMutex.Unlock()
+		l.mu.Unlock()
 
-		l.lazyInit()
 		close(l.connc)
 		for conn := range l.connc {
 			conn.Close()

@@ -88,6 +88,10 @@ func (s *Server) Run(ctx context.Context) (err error) {
 		for conn := range s.connc {
 			conn.Close()
 		}
+
+		if s.muxer != nil {
+			s.muxer.Close()
+		}
 	}()
 
 	s.ctxDo(ctx, s.listen)
