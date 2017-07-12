@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
+	"strconv"
 
 	"github.com/4396/tun/log"
 	"github.com/4396/tun/server"
@@ -10,6 +12,7 @@ import (
 )
 
 type tunServer struct {
+	storage
 	*server.Server
 }
 
@@ -37,10 +40,23 @@ func (s *tunServer) Auth(name, token string) (err error) {
 }
 
 func (s *tunServer) Load(loader server.Loader, name string) (err error) {
-	if name == "ssh" {
-		err = loader.ProxyTCP(name, 6060)
-	} else {
-		err = loader.ProxyHTTP(name, name)
+	p, err := s.storage.Load(name)
+	if err != nil {
+		return
+	}
+
+	switch p.Type {
+	case ProxyTCP:
+		var port int
+		port, err = strconv.Atoi(p.Reserve)
+		if err != nil {
+			return
+		}
+		err = loader.ProxyTCP(p.Name, port)
+	case ProxyHTTP:
+		err = loader.ProxyHTTP(p.Name, p.Reserve)
+	default:
+		err = errors.New("Unexpected proxy")
 	}
 	return
 }

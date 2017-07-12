@@ -94,14 +94,16 @@ func (s *Server) Run(ctx context.Context) (err error) {
 		}
 	}()
 
-	s.ctxDo(ctx, s.listen)
-	s.ctxDo(ctx, s.muxer.Serve)
-	s.ctxDo(ctx, s.service.Serve)
+	s.goctx(ctx, s.listen)
+	if s.muxer != nil {
+		s.goctx(ctx, s.muxer.Serve)
+	}
+	s.goctx(ctx, s.service.Serve)
 
 	for {
 		select {
 		case c := <-s.connc:
-			go s.handleConn(ctx, c)
+			s.handleConn(ctx, c)
 		case <-ctx.Done():
 			err = ctx.Err()
 			return
@@ -117,6 +119,7 @@ func (s *Server) listen(ctx context.Context) (err error) {
 		var conn net.Conn
 		conn, err = s.listener.Accept()
 		if err != nil {
+			s.errc <- err
 			return
 		}
 
@@ -130,7 +133,7 @@ func (s *Server) listen(ctx context.Context) (err error) {
 	}
 }
 
-func (s *Server) ctxDo(ctx context.Context, do func(context.Context) error) {
+func (s *Server) goctx(ctx context.Context, do func(context.Context) error) {
 	go func() {
 		if err := do(ctx); err != nil {
 			s.errc <- err
@@ -139,17 +142,15 @@ func (s *Server) ctxDo(ctx context.Context, do func(context.Context) error) {
 }
 
 func (s *Server) handleConn(ctx context.Context, conn net.Conn) {
-	select {
-	case <-ctx.Done():
-	default:
-		sess, err := newSession(s, conn)
-		if err != nil {
-			conn.Close()
-		} else {
-			s.sessions.Store(sess, sess)
-			defer s.sessions.Delete(sess)
-
-			sess.Run(ctx)
-		}
+	sess, err := newSession(s, conn)
+	if err != nil {
+		conn.Close()
+		return
 	}
+
+	s.sessions.Store(sess, sess)
+	go func() {
+		defer s.sessions.Delete(sess)
+		sess.Run(ctx)
+	}()
 }
