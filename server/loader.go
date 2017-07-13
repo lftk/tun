@@ -32,11 +32,6 @@ func (l *loader) ProxyTCP(name string, port int) (err error) {
 	return
 }
 
-type httpProxy struct {
-	proxy.Proxy
-	domain string
-}
-
 func (l *loader) ProxyHTTP(name, domain string) (err error) {
 	ln, err := l.muxer.Listen(domain)
 	if err != nil {

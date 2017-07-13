@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"flag"
-	"strconv"
+	"fmt"
+
+	"gopkg.in/ini.v1"
 
 	"github.com/4396/tun/log"
 	"github.com/4396/tun/server"
@@ -12,21 +14,29 @@ import (
 )
 
 type tunServer struct {
-	storage
 	*server.Server
+	proxies *ini.File
 }
 
-func Listen(addr, httpAddr string) (s *tunServer, err error) {
-	s = new(tunServer)
-	cfg := &server.Config{
+func newServer(conf string) (s *tunServer, err error) {
+	cfg, err := ini.Load(conf)
+	if err != nil {
+		return
+	}
+
+	sec := cfg.Section("tuns")
+	addr := sec.Key("addr").MustString(":7000")
+	http := sec.Key("http").MustString(":7070")
+
+	s = &tunServer{proxies: cfg}
+	svr, err := server.Listen(&server.Config{
 		Addr:     addr,
-		AddrHTTP: httpAddr,
+		AddrHTTP: http,
 		Auth:     s.Auth,
 		Load:     s.Load,
 		TraffIn:  s.TraffIn,
 		TraffOut: s.TraffOut,
-	}
-	svr, err := server.Listen(cfg)
+	})
 	if err != nil {
 		return
 	}
@@ -36,27 +46,38 @@ func Listen(addr, httpAddr string) (s *tunServer, err error) {
 }
 
 func (s *tunServer) Auth(name, token string) (err error) {
+	sec, err := s.proxies.GetSection(name)
+	if err != nil {
+		err = fmt.Errorf("proxy '%s' not exists", name)
+		return
+	}
+
+	if token != sec.Key("token").String() {
+		err = errors.New("token does not match")
+	}
 	return
 }
 
 func (s *tunServer) Load(loader server.Loader, name string) (err error) {
-	p, err := s.storage.Load(name)
+	sec, err := s.proxies.GetSection(name)
 	if err != nil {
+		err = fmt.Errorf("proxy '%s' not exists", name)
 		return
 	}
 
-	switch p.Type {
-	case ProxyTCP:
+	switch sec.Key("type").String() {
+	case "tcp":
 		var port int
-		port, err = strconv.Atoi(p.Reserve)
+		port, err = sec.Key("port").Int()
 		if err != nil {
 			return
 		}
-		err = loader.ProxyTCP(p.Name, port)
-	case ProxyHTTP:
-		err = loader.ProxyHTTP(p.Name, p.Reserve)
+		err = loader.ProxyTCP(name, port)
+	case "http":
+		domain := sec.Key("domain").String()
+		err = loader.ProxyHTTP(name, domain)
 	default:
-		err = errors.New("Unexpected proxy")
+		err = errors.New("unexpected proxy type")
 	}
 	return
 }
@@ -70,15 +91,14 @@ func (s *tunServer) TraffOut(name string, b []byte) {
 }
 
 var (
-	addr     = flag.String("addr", ":7000", "tun server listen addr")
-	httpAddr = flag.String("http", ":7070", "web server listen addr")
+	conf = flag.String("c", "conf/tuns.ini", "config file's path")
 )
 
 func main() {
 	flag.Parse()
 	log.Infof("Start tun server, version is %s", version.Version)
 
-	s, err := Listen(*addr, *httpAddr)
+	s, err := newServer(*conf)
 	if err != nil {
 		log.Fatal(err)
 	}

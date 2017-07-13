@@ -40,7 +40,11 @@ func (m *Muxer) Close() error {
 }
 
 func (m *Muxer) Listen(domain string) (l net.Listener, err error) {
-	l = fake.NewListener()
+	l = &listener{
+		Muxer:    m,
+		Domain:   domain,
+		Listener: fake.NewListener(),
+	}
 	_, loaded := m.domains.LoadOrStore(domain, l)
 	if loaded {
 		err = errors.New("")
