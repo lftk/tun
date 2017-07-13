@@ -1,8 +1,0 @@
-server: :7000
-proxies:
-  godoc:
-    addr: :9090
-    token: token
-  web1:
-    addr: :8080
-    token: token
