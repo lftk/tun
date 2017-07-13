@@ -84,7 +84,7 @@ func (m *Muxer) handleConn(conn net.Conn) {
 		return
 	}
 
-	err = val.(*fake.Listener).Put(cc)
+	err = val.(*listener).Put(cc)
 	if err != nil {
 		// 500
 		cc.Close()

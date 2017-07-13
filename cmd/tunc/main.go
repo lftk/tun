@@ -3,11 +3,10 @@ package main
 import (
 	"context"
 	"flag"
-	"io/ioutil"
 	"os"
 	"time"
 
-	"gopkg.in/yaml.v2"
+	"gopkg.in/ini.v1"
 
 	"github.com/4396/tun/client"
 	"github.com/4396/tun/log"
@@ -15,11 +14,11 @@ import (
 )
 
 var (
-	conf   = flag.String("c", "conf/tunc.yaml", "config file's path")
+	conf   = flag.String("c", "conf/tunc.ini", "config file's path")
 	server = flag.String("server", "", "tun server addr")
 	name   = flag.String("name", "", "tun proxy name")
 	token  = flag.String("token", "", "tun proxy token")
-	addr   = flag.String("addr", "", "tun proxy addr")
+	addr   = flag.String("addr", "", "tun proxy local addr")
 )
 
 type proxy struct {
@@ -29,22 +28,53 @@ type proxy struct {
 
 type config struct {
 	Server  string
-	Proxies map[string]proxy
+	Proxies map[string]*proxy
 }
 
-func loadConfig() (cfg config, err error) {
+func parse(filename string, cfg *config) (err error) {
 	_, errSt := os.Stat(*conf)
-	if errSt == nil {
-		var b []byte
-		b, err = ioutil.ReadFile(*conf)
-		if err != nil {
-			return
+	if errSt != nil {
+		return
+	}
+
+	f, err := ini.Load(filename)
+	if err != nil {
+		return
+	}
+
+	for _, sec := range f.Sections() {
+		name := sec.Name()
+		if name == "tunc" {
+			cfg.Server = sec.Key("server").String()
+			continue
 		}
 
-		err = yaml.Unmarshal(b, &cfg)
-		if err != nil {
-			return
+		token := sec.Key("token").String()
+		if token == "" {
+			continue
 		}
+
+		addr := sec.Key("addr").String()
+		if addr == "" {
+			continue
+		}
+
+		cfg.Proxies[name] = &proxy{
+			Addr:  addr,
+			Token: token,
+		}
+	}
+	return
+}
+
+func loadConfig() (cfg *config, err error) {
+	cfg = &config{
+		Proxies: make(map[string]*proxy),
+	}
+
+	err = parse(*conf, cfg)
+	if err != nil {
+		return
 	}
 
 	if *server != "" {
@@ -52,10 +82,7 @@ func loadConfig() (cfg config, err error) {
 	}
 
 	if *name != "" && *addr != "" {
-		if cfg.Proxies == nil {
-			cfg.Proxies = make(map[string]proxy)
-		}
-		cfg.Proxies[*name] = proxy{
+		cfg.Proxies[*name] = &proxy{
 			Addr:  *addr,
 			Token: *token,
 		}
