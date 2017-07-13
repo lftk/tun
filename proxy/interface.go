@@ -15,7 +15,7 @@ type Dialer interface {
 }
 
 type Proxy interface {
-	Name() string
+	ID() string
 	Close() error
 	Accept() (net.Conn, error)
 	Bind(Dialer) error

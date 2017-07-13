@@ -7,22 +7,22 @@ import (
 	"sync"
 )
 
-func Wrap(name string, listener net.Listener) Proxy {
+func Wrap(id string, listener net.Listener) Proxy {
 	return &proxy{
-		name:     name,
+		id:       id,
 		listener: listener,
 	}
 }
 
 type proxy struct {
-	name     string
+	id       string
 	dialer   Dialer
 	locker   sync.RWMutex
 	listener net.Listener
 }
 
-func (p *proxy) Name() string {
-	return p.name
+func (p *proxy) ID() string {
+	return p.id
 }
 
 func (p *proxy) Close() error {
@@ -79,7 +79,7 @@ func (p *proxy) Handle(conn net.Conn, traff Traffic) (err error) {
 	}
 
 	trafficConn{
-		name:    p.name,
+		ID:      p.id,
 		Conn:    conn,
 		Traffic: traff,
 	}.Join(worker)
@@ -87,7 +87,7 @@ func (p *proxy) Handle(conn net.Conn, traff Traffic) (err error) {
 }
 
 type trafficConn struct {
-	name string
+	ID string
 	net.Conn
 	Traffic
 }
@@ -95,7 +95,7 @@ type trafficConn struct {
 func (tc trafficConn) Read(b []byte) (n int, err error) {
 	n, err = tc.Conn.Read(b)
 	if tc.Traffic != nil && n > 0 {
-		tc.Traffic.In(tc.name, b[:n])
+		tc.Traffic.In(tc.ID, b[:n])
 	}
 	return
 }
@@ -103,7 +103,7 @@ func (tc trafficConn) Read(b []byte) (n int, err error) {
 func (tc trafficConn) Write(b []byte) (n int, err error) {
 	n, err = tc.Conn.Write(b)
 	if tc.Traffic != nil && n > 0 {
-		tc.Traffic.Out(tc.name, b[:n])
+		tc.Traffic.Out(tc.ID, b[:n])
 	}
 	return
 }

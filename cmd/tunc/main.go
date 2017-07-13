@@ -16,7 +16,7 @@ import (
 var (
 	conf   = flag.String("c", "conf/tunc.ini", "config file's path")
 	server = flag.String("server", "", "tun server addr")
-	name   = flag.String("name", "", "tun proxy name")
+	id     = flag.String("id", "", "tun proxy id")
 	token  = flag.String("token", "", "tun proxy token")
 	addr   = flag.String("addr", "", "tun proxy local addr")
 )
@@ -43,8 +43,8 @@ func parse(filename string, cfg *config) (err error) {
 	}
 
 	for _, sec := range f.Sections() {
-		name := sec.Name()
-		if name == "tunc" {
+		id := sec.Name()
+		if id == "tunc" {
 			cfg.Server = sec.Key("server").String()
 			continue
 		}
@@ -59,7 +59,7 @@ func parse(filename string, cfg *config) (err error) {
 			continue
 		}
 
-		cfg.Proxies[name] = &proxy{
+		cfg.Proxies[id] = &proxy{
 			Addr:  addr,
 			Token: token,
 		}
@@ -81,8 +81,8 @@ func loadConfig() (cfg *config, err error) {
 		cfg.Server = *server
 	}
 
-	if *name != "" && *addr != "" {
-		cfg.Proxies[*name] = &proxy{
+	if *id != "" && *addr != "" {
+		cfg.Proxies[*id] = &proxy{
 			Addr:  *addr,
 			Token: *token,
 		}
@@ -114,13 +114,13 @@ func main() {
 		}
 		log.Info("Connect tun server success")
 
-		for name, proxy := range cfg.Proxies {
-			err = c.Proxy(name, proxy.Token, proxy.Addr)
+		for id, proxy := range cfg.Proxies {
+			err = c.Proxy(id, proxy.Token, proxy.Addr)
 			if err != nil {
-				log.Fatalf("Load [%s] failed, %v", name, err)
+				log.Fatalf("Load [%s] failed, %v", id, err)
 				return
 			}
-			log.Infof("Load [%s] success", name)
+			log.Infof("Load [%s] success", id)
 		}
 
 		idx = 0

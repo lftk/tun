@@ -63,7 +63,7 @@ func (s *Service) Serve(ctx context.Context) (err error) {
 }
 
 func (s *Service) Proxy(p Proxy) (err error) {
-	_, loaded := s.proxies.LoadOrStore(p.Name(), p)
+	_, loaded := s.proxies.LoadOrStore(p.ID(), p)
 	if loaded {
 		err = errors.New("Already existed")
 		return
@@ -83,18 +83,18 @@ func (s *Service) Proxies() (proxies []Proxy) {
 	return
 }
 
-func (s *Service) Load(name string) (p Proxy, ok bool) {
-	val, ok := s.proxies.Load(name)
+func (s *Service) Load(id string) (p Proxy, ok bool) {
+	val, ok := s.proxies.Load(id)
 	if ok {
 		p = val.(Proxy)
 	}
 	return
 }
 
-func (s *Service) Kill(name string) (p Proxy) {
-	val, ok := s.proxies.Load(name)
+func (s *Service) Kill(id string) (p Proxy) {
+	val, ok := s.proxies.Load(id)
 	if ok {
-		s.proxies.Delete(name)
+		s.proxies.Delete(id)
 		p = val.(Proxy)
 		p.Close()
 	}
@@ -103,8 +103,8 @@ func (s *Service) Kill(name string) (p Proxy) {
 
 var ErrInvalidProxy = errors.New("Invalid proxy")
 
-func (s *Service) Register(name string, dialer Dialer) (err error) {
-	if val, ok := s.proxies.Load(name); ok {
+func (s *Service) Register(id string, dialer Dialer) (err error) {
+	if val, ok := s.proxies.Load(id); ok {
 		err = val.(Proxy).Bind(dialer)
 	} else {
 		err = ErrInvalidProxy
@@ -112,8 +112,8 @@ func (s *Service) Register(name string, dialer Dialer) (err error) {
 	return
 }
 
-func (s *Service) Unregister(name string, dialer Dialer) (err error) {
-	if val, ok := s.proxies.Load(name); ok {
+func (s *Service) Unregister(id string, dialer Dialer) (err error) {
+	if val, ok := s.proxies.Load(id); ok {
 		err = val.(Proxy).Unbind(dialer)
 	} else {
 		err = ErrInvalidProxy

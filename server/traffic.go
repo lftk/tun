@@ -5,14 +5,14 @@ type traffic struct {
 	TraffOut TraffFunc
 }
 
-func (t *traffic) In(name string, b []byte) {
+func (t *traffic) In(id string, b []byte) {
 	if t.TraffIn != nil {
-		t.TraffIn(name, b)
+		t.TraffIn(id, b)
 	}
 }
 
-func (t *traffic) Out(name string, b []byte) {
+func (t *traffic) Out(id string, b []byte) {
 	if t.TraffOut != nil {
-		t.TraffOut(name, b)
+		t.TraffOut(id, b)
 	}
 }

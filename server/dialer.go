@@ -9,7 +9,7 @@ import (
 
 type dialer struct {
 	*mux.Session
-	Name string
+	ID string
 }
 
 func (d *dialer) Dial() (conn net.Conn, err error) {
@@ -18,7 +18,7 @@ func (d *dialer) Dial() (conn net.Conn, err error) {
 		return
 	}
 
-	err = msg.Write(conn, &msg.Worker{Name: d.Name})
+	err = msg.Write(conn, &msg.Worker{ID: d.ID})
 	return
 }
 

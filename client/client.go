@@ -56,11 +56,11 @@ func Dial(addr string) (c *Client, err error) {
 	return
 }
 
-func (c *Client) authProxy(name, token string) (err error) {
+func (c *Client) authProxy(id, token string) (err error) {
 	ver := version.Version
 	hostname, _ := os.Hostname()
 	err = msg.Write(c.cmd, &msg.Proxy{
-		Name:     name,
+		ID:       id,
 		Token:    token,
 		Version:  ver,
 		Hostname: hostname,
@@ -87,21 +87,21 @@ func (c *Client) authProxy(name, token string) (err error) {
 	return
 }
 
-func (c *Client) Proxy(name, token, addr string) (err error) {
-	err = c.authProxy(name, token)
+func (c *Client) Proxy(id, token, addr string) (err error) {
+	err = c.authProxy(id, token)
 	if err != nil {
 		return
 	}
 
 	l := fake.NewListener()
-	p := proxy.Wrap(name, l)
+	p := proxy.Wrap(id, l)
 	p.Bind(&dialer{Addr: addr})
 	err = c.service.Proxy(p)
 	if err != nil {
 		return
 	}
 
-	c.listeners.Store(name, l)
+	c.listeners.Store(id, l)
 	return
 }
 
@@ -175,7 +175,7 @@ func (c *Client) handleConn(conn net.Conn) {
 		return
 	}
 
-	val, ok := c.listeners.Load(worker.Name)
+	val, ok := c.listeners.Load(worker.ID)
 	if ok {
 		err = val.(*fake.Listener).Put(conn)
 	}

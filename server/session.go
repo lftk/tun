@@ -41,14 +41,14 @@ func newSession(s *Server, conn net.Conn) (sess *session, err error) {
 	return
 }
 
-func (s *session) Kill(name string) (ok bool) {
+func (s *session) Kill(id string) (ok bool) {
 	s.locker.Lock()
 	defer s.locker.Unlock()
 
 	for e := s.proxies.Front(); e != nil; e = e.Next() {
-		if e.Value.(string) == name {
+		if e.Value.(string) == id {
 			s.proxies.Remove(e)
-			s.kill(name)
+			s.kill(id)
 			ok = true
 			return
 		}
@@ -56,8 +56,8 @@ func (s *session) Kill(name string) (ok bool) {
 	return
 }
 
-func (s *session) kill(name string) {
-	s.server.service.Kill(name)
+func (s *session) kill(id string) {
+	s.server.service.Kill(id)
 }
 
 func (s *session) Run(ctx context.Context) (err error) {
@@ -106,10 +106,10 @@ func (s *session) handleProxy(proxy *msg.Proxy) (err error) {
 		} else {
 			err = msg.Write(s.cmd, &msg.Version{Version: version.Version})
 			if err != nil {
-				s.kill(proxy.Name)
+				s.kill(proxy.ID)
 			} else {
 				s.locker.Lock()
-				s.proxies.PushBack(proxy.Name)
+				s.proxies.PushBack(proxy.ID)
 				s.locker.Unlock()
 			}
 		}
@@ -121,25 +121,27 @@ func (s *session) handleProxy(proxy *msg.Proxy) (err error) {
 	}
 
 	if s.server.auth != nil {
-		err = s.server.auth(proxy.Name, proxy.Token)
+		err = s.server.auth(proxy.ID, proxy.Token)
 		if err != nil {
 			return
 		}
 	}
 
-	_, ok := s.server.service.Load(proxy.Name)
+	_, ok := s.server.service.Load(proxy.ID)
 	if !ok {
 		if s.server.load != nil {
-			err = s.server.load(&loader{s.server}, proxy.Name)
+			err = s.server.load(&loader{s.server}, proxy.ID)
 		} else {
 			err = errors.New("Not exists proxy")
 		}
 	}
-
-	d := &dialer{
-		Session: s.session,
-		Name:    proxy.Name,
+	if err != nil {
+		return
 	}
-	err = s.server.service.Register(proxy.Name, d)
+
+	err = s.server.service.Register(proxy.ID, &dialer{
+		Session: s.session,
+		ID:      proxy.ID,
+	})
 	return
 }

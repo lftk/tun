@@ -45,10 +45,10 @@ func newServer(conf string) (s *tunServer, err error) {
 	return
 }
 
-func (s *tunServer) Auth(name, token string) (err error) {
-	sec, err := s.proxies.GetSection(name)
+func (s *tunServer) Auth(id, token string) (err error) {
+	sec, err := s.proxies.GetSection(id)
 	if err != nil {
-		err = fmt.Errorf("proxy '%s' not exists", name)
+		err = fmt.Errorf("proxy '%s' not exists", id)
 		return
 	}
 
@@ -58,10 +58,10 @@ func (s *tunServer) Auth(name, token string) (err error) {
 	return
 }
 
-func (s *tunServer) Load(loader server.Loader, name string) (err error) {
-	sec, err := s.proxies.GetSection(name)
+func (s *tunServer) Load(loader server.Loader, id string) (err error) {
+	sec, err := s.proxies.GetSection(id)
 	if err != nil {
-		err = fmt.Errorf("proxy '%s' not exists", name)
+		err = fmt.Errorf("proxy '%s' not exists", id)
 		return
 	}
 
@@ -72,22 +72,22 @@ func (s *tunServer) Load(loader server.Loader, name string) (err error) {
 		if err != nil {
 			return
 		}
-		err = loader.ProxyTCP(name, port)
+		err = loader.ProxyTCP(id, port)
 	case "http":
 		domain := sec.Key("domain").String()
-		err = loader.ProxyHTTP(name, domain)
+		err = loader.ProxyHTTP(id, domain)
 	default:
 		err = errors.New("unexpected proxy type")
 	}
 	return
 }
 
-func (s *tunServer) TraffIn(name string, b []byte) {
-	log.Infof("[IN] %s %d", name, len(b))
+func (s *tunServer) TraffIn(id string, b []byte) {
+	log.Infof("[IN] %s %d", id, len(b))
 }
 
-func (s *tunServer) TraffOut(name string, b []byte) {
-	log.Infof("[OUT] %s %d", name, len(b))
+func (s *tunServer) TraffOut(id string, b []byte) {
+	log.Infof("[OUT] %s %d", id, len(b))
 }
 
 var (

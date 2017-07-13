@@ -7,7 +7,7 @@ import (
 type Message interface{}
 
 type Proxy struct {
-	Name     string
+	ID       string
 	Token    string
 	Version  string
 	Hostname string
@@ -24,7 +24,7 @@ type Version struct {
 }
 
 type Worker struct {
-	Name string
+	ID string
 }
 
 func typeof(v interface{}) reflect.Type {

@@ -22,9 +22,9 @@ type Server struct {
 }
 
 type (
-	TraffFunc func(name string, b []byte)
-	AuthFunc  func(name, token string) error
-	LoadFunc  func(loader Loader, name string) error
+	TraffFunc func(id string, b []byte)
+	AuthFunc  func(id, token string) error
+	LoadFunc  func(loader Loader, id string) error
 )
 
 type Config struct {
@@ -72,9 +72,9 @@ func (s *Server) Proxies() []proxy.Proxy {
 	return s.service.Proxies()
 }
 
-func (s *Server) Kill(name string) {
+func (s *Server) Kill(id string) {
 	s.sessions.Range(func(key, val interface{}) bool {
-		return !val.(*session).Kill(name)
+		return !val.(*session).Kill(id)
 	})
 }
 

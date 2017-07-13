@@ -8,8 +8,8 @@ import (
 )
 
 type Loader interface {
-	ProxyTCP(name string, port int) error
-	ProxyHTTP(name, domain string) error
+	ProxyTCP(id string, port int) error
+	ProxyHTTP(id, domain string) error
 	Proxy(proxy.Proxy) error
 }
 
@@ -17,14 +17,14 @@ type loader struct {
 	*Server
 }
 
-func (l *loader) ProxyTCP(name string, port int) (err error) {
+func (l *loader) ProxyTCP(id string, port int) (err error) {
 	addr := fmt.Sprintf(":%d", port)
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return
 	}
 
-	p := proxy.Wrap(name, ln)
+	p := proxy.Wrap(id, ln)
 	err = l.Proxy(p)
 	if err != nil {
 		ln.Close()
@@ -32,13 +32,13 @@ func (l *loader) ProxyTCP(name string, port int) (err error) {
 	return
 }
 
-func (l *loader) ProxyHTTP(name, domain string) (err error) {
+func (l *loader) ProxyHTTP(id, domain string) (err error) {
 	ln, err := l.muxer.Listen(domain)
 	if err != nil {
 		return
 	}
 
-	p := proxy.Wrap(name, ln)
+	p := proxy.Wrap(id, ln)
 	err = l.Proxy(p)
 	if err != nil {
 		ln.Close()
