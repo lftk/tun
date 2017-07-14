@@ -6,11 +6,10 @@ import (
 	"os"
 	"time"
 
-	"gopkg.in/ini.v1"
-
 	"github.com/4396/tun/client"
 	"github.com/4396/tun/log"
 	"github.com/4396/tun/version"
+	"gopkg.in/ini.v1"
 )
 
 var (

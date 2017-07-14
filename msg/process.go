@@ -20,7 +20,7 @@ func readMsg(r io.Reader) (t byte, b []byte, err error) {
 	}
 
 	if t = b1[0]; int(t) >= len(typeMsgs) {
-		err = errors.New("Message type error")
+		err = errors.New("message type error")
 		return
 	}
 
@@ -30,7 +30,7 @@ func readMsg(r io.Reader) (t byte, b []byte, err error) {
 	}
 
 	if n > MaxMsgLength {
-		err = errors.New("Message length exceed the limit")
+		err = errors.New("message length exceed the limit")
 		return
 	}
 
@@ -41,7 +41,7 @@ func readMsg(r io.Reader) (t byte, b []byte, err error) {
 	}
 
 	if int64(rn) != n {
-		err = errors.New("Message format error")
+		err = errors.New("message format error")
 	}
 	return
 }

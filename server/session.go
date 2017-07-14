@@ -5,11 +5,10 @@ import (
 	"errors"
 	"net"
 
-	"github.com/golang/sync/syncmap"
-
 	"github.com/4396/tun/msg"
 	"github.com/4396/tun/mux"
 	"github.com/4396/tun/version"
+	"github.com/golang/sync/syncmap"
 )
 
 type session struct {

@@ -11,7 +11,7 @@ import (
 func unpack(t byte, b []byte, in Message) (msg Message, err error) {
 	if in == nil {
 		if t >= byte(len(typeMsgs)) {
-			err = errors.New("Unknown msg type")
+			err = errors.New("unknown message type")
 			return
 		}
 		msg = reflect.New(typeMsgs[t]).Interface().(Message)
@@ -34,7 +34,7 @@ func UnPack(t byte, b []byte) (Message, error) {
 func Pack(msg Message) (b []byte, err error) {
 	t, ok := msgTypes[typeof(msg)]
 	if !ok {
-		err = errors.New("Unknown msg type")
+		err = errors.New("unknown message type")
 		return
 	}
 

@@ -2,7 +2,7 @@ package proxy
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"net"
 
 	"github.com/golang/sync/syncmap"
@@ -65,7 +65,7 @@ func (s *Service) Serve(ctx context.Context) (err error) {
 func (s *Service) Proxy(p Proxy) (err error) {
 	_, loaded := s.proxies.LoadOrStore(p.ID(), p)
 	if loaded {
-		err = errors.New("Already existed")
+		err = fmt.Errorf("proxy '%s' already exists", p.ID())
 		return
 	}
 
@@ -91,23 +91,20 @@ func (s *Service) Load(id string) (p Proxy, ok bool) {
 	return
 }
 
-func (s *Service) Kill(id string) (p Proxy) {
+func (s *Service) Kill(id string) {
 	val, ok := s.proxies.Load(id)
 	if ok {
 		s.proxies.Delete(id)
-		p = val.(Proxy)
-		p.Close()
+		val.(Proxy).Close()
 	}
 	return
 }
-
-var ErrInvalidProxy = errors.New("Invalid proxy")
 
 func (s *Service) Register(id string, dialer Dialer) (err error) {
 	if val, ok := s.proxies.Load(id); ok {
 		err = val.(Proxy).Bind(dialer)
 	} else {
-		err = ErrInvalidProxy
+		err = fmt.Errorf("proxy '%s' not exists", id)
 	}
 	return
 }
@@ -116,7 +113,7 @@ func (s *Service) Unregister(id string, dialer Dialer) (err error) {
 	if val, ok := s.proxies.Load(id); ok {
 		err = val.(Proxy).Unbind(dialer)
 	} else {
-		err = ErrInvalidProxy
+		err = fmt.Errorf("proxy '%s' not exists", id)
 	}
 	return
 }

@@ -7,13 +7,12 @@ import (
 	"os"
 	"runtime"
 
-	"github.com/golang/sync/syncmap"
-
 	"github.com/4396/tun/fake"
 	"github.com/4396/tun/msg"
 	"github.com/4396/tun/mux"
 	"github.com/4396/tun/proxy"
 	"github.com/4396/tun/version"
+	"github.com/golang/sync/syncmap"
 )
 
 var (

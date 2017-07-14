@@ -6,11 +6,10 @@ import (
 	"flag"
 	"fmt"
 
-	"gopkg.in/ini.v1"
-
 	"github.com/4396/tun/log"
 	"github.com/4396/tun/server"
 	"github.com/4396/tun/version"
+	"gopkg.in/ini.v1"
 )
 
 type tunServer struct {

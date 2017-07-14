@@ -8,13 +8,17 @@ import (
 )
 
 type Loader interface {
+	Proxy(p proxy.Proxy) error
 	ProxyTCP(id string, port int) error
 	ProxyHTTP(id, domain string) error
-	Proxy(proxy.Proxy) error
 }
 
 type loader struct {
 	*Server
+}
+
+func (l *loader) Proxy(p proxy.Proxy) error {
+	return l.service.Proxy(p)
 }
 
 func (l *loader) ProxyTCP(id string, port int) (err error) {
@@ -44,8 +48,4 @@ func (l *loader) ProxyHTTP(id, domain string) (err error) {
 		ln.Close()
 	}
 	return
-}
-
-func (l *loader) Proxy(p proxy.Proxy) error {
-	return l.service.Proxy(p)
 }

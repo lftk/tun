@@ -6,8 +6,8 @@ import (
 
 // Traffic is used to record incoming and outgoing traffic.
 type Traffic interface {
-	In(string, []byte)
-	Out(string, []byte)
+	In(id string, b []byte)
+	Out(id string, b []byte)
 }
 
 // Dialer establishes a working connection with the remote service.

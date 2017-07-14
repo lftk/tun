@@ -4,10 +4,9 @@ import (
 	"context"
 	"net"
 
-	"github.com/golang/sync/syncmap"
-
 	"github.com/4396/tun/proxy"
 	"github.com/4396/tun/vhost"
+	"github.com/golang/sync/syncmap"
 )
 
 type Server struct {
