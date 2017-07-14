@@ -1,11 +1,11 @@
 package server
 
 import (
-	"container/list"
 	"context"
 	"errors"
 	"net"
-	"sync"
+
+	"github.com/golang/sync/syncmap"
 
 	"github.com/4396/tun/msg"
 	"github.com/4396/tun/mux"
@@ -16,8 +16,7 @@ type session struct {
 	server  *Server
 	session *mux.Session
 	cmd     net.Conn
-	proxies *list.List
-	locker  sync.Mutex
+	proxies syncmap.Map
 }
 
 func newSession(s *Server, conn net.Conn) (sess *session, err error) {
@@ -36,28 +35,19 @@ func newSession(s *Server, conn net.Conn) (sess *session, err error) {
 		server:  s,
 		session: ms,
 		cmd:     cmd,
-		proxies: list.New(),
 	}
 	return
 }
 
 func (s *session) Kill(id string) (ok bool) {
-	s.locker.Lock()
-	defer s.locker.Unlock()
-
-	for e := s.proxies.Front(); e != nil; e = e.Next() {
-		if e.Value.(string) == id {
-			s.proxies.Remove(e)
-			s.kill(id)
-			ok = true
-			return
+	s.proxies.Range(func(key, val interface{}) bool {
+		ok = (id == key.(string))
+		if ok {
+			s.server.service.Kill(id)
 		}
-	}
+		return !ok
+	})
 	return
-}
-
-func (s *session) kill(id string) {
-	s.server.service.Kill(id)
 }
 
 func (s *session) Run(ctx context.Context) (err error) {
@@ -65,12 +55,10 @@ func (s *session) Run(ctx context.Context) (err error) {
 		s.cmd.Close()
 		s.session.Close()
 
-		s.locker.Lock()
-		for e := s.proxies.Front(); e != nil; e = e.Next() {
-			s.kill(e.Value.(string))
-		}
-		s.proxies.Init()
-		s.locker.Unlock()
+		s.proxies.Range(func(key, val interface{}) bool {
+			s.server.service.Kill(key.(string))
+			return true
+		})
 	}()
 
 	for {
@@ -106,11 +94,9 @@ func (s *session) handleProxy(proxy *msg.Proxy) (err error) {
 		} else {
 			err = msg.Write(s.cmd, &msg.Version{Version: version.Version})
 			if err != nil {
-				s.kill(proxy.ID)
+				s.server.service.Kill(proxy.ID)
 			} else {
-				s.locker.Lock()
-				s.proxies.PushBack(proxy.ID)
-				s.locker.Unlock()
+				s.proxies.Store(proxy.ID, nil)
 			}
 		}
 	}()
