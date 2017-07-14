@@ -7,6 +7,7 @@ import (
 	"sync"
 )
 
+// Wrap a net.Listener to generate a Proxy.
 func Wrap(id string, listener net.Listener) Proxy {
 	return &proxy{
 		id:       id,
@@ -17,7 +18,7 @@ func Wrap(id string, listener net.Listener) Proxy {
 type proxy struct {
 	id       string
 	dialer   Dialer
-	locker   sync.RWMutex
+	mu       sync.RWMutex
 	listener net.Listener
 }
 
@@ -27,11 +28,11 @@ func (p *proxy) ID() string {
 
 func (p *proxy) Close() error {
 	p.listener.Close()
-	p.locker.Lock()
+	p.mu.Lock()
 	if p.dialer != nil {
 		p.dialer.Close()
 	}
-	p.locker.Unlock()
+	p.mu.Unlock()
 	return nil
 }
 
@@ -39,12 +40,13 @@ func (p *proxy) Accept() (net.Conn, error) {
 	return p.listener.Accept()
 }
 
+// Bind a dialer, only one dialer can be bound.
 func (p *proxy) Bind(dialer Dialer) (err error) {
-	p.locker.Lock()
-	defer p.locker.Unlock()
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
 	if p.dialer != nil {
-		err = errors.New("exists dialer")
+		err = errors.New("already bound dialer")
 		return
 	}
 
@@ -53,23 +55,25 @@ func (p *proxy) Bind(dialer Dialer) (err error) {
 }
 
 func (p *proxy) Unbind(dialer Dialer) (err error) {
-	p.locker.Lock()
-	defer p.locker.Unlock()
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
 	if p.dialer == dialer {
 		p.dialer = nil
 		dialer.Close()
+	} else {
+		err = errors.New("the dialer is not bound")
 	}
 	return
 }
 
 func (p *proxy) Handle(conn net.Conn, traff Traffic) (err error) {
 	var dialer Dialer
-	p.locker.RLock()
+	p.mu.RLock()
 	dialer = p.dialer
-	p.locker.RUnlock()
+	p.mu.RUnlock()
 	if dialer == nil {
-		err = errors.New("not bind dialer")
+		err = errors.New("unbund dialer")
 		return
 	}
 
