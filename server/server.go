@@ -9,6 +9,9 @@ import (
 	"github.com/golang/sync/syncmap"
 )
 
+// Server combination net.Listener and vhost.Muxer, manage all proxies.
+// Listen to the client's connection and the user's http connection.
+// The load function loads the proxy using lazy load mode.
 type Server struct {
 	listener net.Listener
 	connc    chan net.Conn
@@ -20,12 +23,7 @@ type Server struct {
 	errc     chan error
 }
 
-type (
-	TraffFunc func(id string, b []byte)
-	AuthFunc  func(id, token string) error
-	LoadFunc  func(loader Loader, id string) error
-)
-
+// Config describes the configuration information for the server.
 type Config struct {
 	Addr     string
 	AddrHTTP string
@@ -35,6 +33,16 @@ type Config struct {
 	TraffOut TraffFunc
 }
 
+// TraffFunc record proxy's traffic.
+type TraffFunc func(id string, b []byte)
+
+// AuthFunc authentication proxy through id and token.
+type AuthFunc func(id, token string) error
+
+// LoadFunc using loader to load proxy with id.
+type LoadFunc func(loader Loader, id string) error
+
+// Listen tun address and http address, return a server.
 func Listen(cfg *Config) (s *Server, err error) {
 	var (
 		listener net.Listener

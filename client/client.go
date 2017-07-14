@@ -131,10 +131,10 @@ func (c *Client) Run(ctx context.Context) (err error) {
 		select {
 		case conn := <-connc:
 			c.handleConn(conn)
-		case err = <-c.errc:
-			return
 		case <-ctx.Done():
 			err = ctx.Err()
+			return
+		case err = <-c.errc:
 			return
 		}
 	}

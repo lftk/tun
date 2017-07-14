@@ -7,9 +7,10 @@ import (
 	"strings"
 )
 
-var Version = "0.1.0"
-
 var (
+	// Version describes the current version.
+	Version = "0.1.0"
+
 	minClientVersion = "0.1.0"
 	minServerVersion = "0.1.0"
 )
@@ -21,7 +22,7 @@ func CompatClient(ver string) (err error) {
 	}
 
 	if !b {
-		err = fmt.Errorf("Version is too low, at least %s", minClientVersion)
+		err = fmt.Errorf("version is too low, at least %s", minClientVersion)
 	}
 	return
 }
@@ -33,7 +34,7 @@ func CompatServer(ver string) (err error) {
 	}
 
 	if !b {
-		err = fmt.Errorf("Version is too high, server is %s", ver)
+		err = fmt.Errorf("version is too high, server is %s", ver)
 	}
 	return
 }
@@ -51,7 +52,7 @@ func compat(ver, min string) (b bool, err error) {
 func toInts(ver string) (vv []int, err error) {
 	ss := strings.Split(ver, ".")
 	if len(ss) != 3 {
-		err = errors.New("Invalid version")
+		err = errors.New("invalid version")
 		return
 	}
 
