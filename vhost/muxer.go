@@ -42,7 +42,7 @@ func (m *Muxer) Listen(domain string) (l net.Listener, err error) {
 	l = &listener{
 		Muxer:    m,
 		Domain:   domain,
-		Listener: fake.NewListener(),
+		Listener: fake.NewListener(16),
 	}
 	_, loaded := m.domains.LoadOrStore(domain, l)
 	if loaded {

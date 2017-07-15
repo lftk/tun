@@ -97,7 +97,7 @@ func (c *Client) Proxy(id, token, addr string) (err error) {
 		return
 	}
 
-	l := fake.NewListener()
+	l := fake.NewListener(16)
 	p := proxy.Wrap(id, l)
 	p.Bind(&dialer{Addr: addr})
 	err = c.service.Proxy(p)
