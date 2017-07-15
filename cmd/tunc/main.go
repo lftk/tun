@@ -8,6 +8,7 @@ import (
 
 	"github.com/4396/tun/client"
 	"github.com/4396/tun/log"
+	"github.com/4396/tun/log/impl"
 	"github.com/4396/tun/version"
 	"gopkg.in/ini.v1"
 )
@@ -91,6 +92,7 @@ func loadConfig() (cfg *config, err error) {
 
 func main() {
 	flag.Parse()
+	log.Use(&impl.Logger{})
 	log.Infof("Start tun client, version is %s", version.Version)
 
 	cfg, err := loadConfig()

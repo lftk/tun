@@ -2,11 +2,11 @@ package log
 
 import (
 	"fmt"
-
-	"github.com/golang/glog"
 )
 
-type logger interface {
+// Logger is used to record different levels of logs.
+// Implementing a logger requires that all methods are thread-safe.
+type Logger interface {
 	Verbose(depth int, args ...interface{})
 	Debug(depth int, args ...interface{})
 	Info(depth int, args ...interface{})
@@ -15,106 +15,94 @@ type logger interface {
 	Fatal(depth int, args ...interface{})
 }
 
-type glogger struct{}
+// Default logger
+var l Logger
 
-func (l *glogger) Verbose(depth int, args ...interface{}) {
-	if glog.V(20) {
-		glog.InfoDepth(depth+1, args...)
-	}
+// Use custom logger, Non-thread safe.
+func Use(logger Logger) {
+	l = logger
 }
 
-func (l *glogger) Debug(depth int, args ...interface{}) {
-	if glog.V(10) {
-		glog.InfoDepth(depth+1, args...)
-	}
-}
-
-func (l *glogger) Info(depth int, args ...interface{}) {
-	glog.InfoDepth(depth+1, args...)
-}
-
-func (l *glogger) Warning(depth int, args ...interface{}) {
-	glog.WarningDepth(depth+1, args...)
-}
-
-func (l *glogger) Error(depth int, args ...interface{}) {
-	glog.ErrorDepth(depth+1, args...)
-}
-
-func (l *glogger) Fatal(depth int, args ...interface{}) {
-	glog.FatalDepth(depth+1, args...)
-}
-
-var Logger = new(glogger)
-
+// Verbose logs detailed log information.
 func Verbose(args ...interface{}) {
-	if Logger != nil {
-		Logger.Verbose(1, args...)
+	if l != nil {
+		l.Verbose(1, args...)
 	}
 }
 
+// Verbosef logs detailed log information.
 func Verbosef(format string, args ...interface{}) {
-	if Logger != nil {
-		Logger.Verbose(1, fmt.Sprintf(format, args...))
+	if l != nil {
+		l.Verbose(1, fmt.Sprintf(format, args...))
 	}
 }
 
+// Debug logs debug level log information.
 func Debug(args ...interface{}) {
-	if Logger != nil {
-		Logger.Debug(1, args...)
+	if l != nil {
+		l.Debug(1, args...)
 	}
 }
 
+// Debugf logs debug level log information.
 func Debugf(format string, args ...interface{}) {
-	if Logger != nil {
-		Logger.Debug(1, fmt.Sprintf(format, args...))
+	if l != nil {
+		l.Debug(1, fmt.Sprintf(format, args...))
 	}
 }
 
+// Info logs info level log information.
 func Info(args ...interface{}) {
-	if Logger != nil {
-		Logger.Info(1, args...)
+	if l != nil {
+		l.Info(1, args...)
 	}
 }
 
+// Infof logs info level log information.
 func Infof(format string, args ...interface{}) {
-	if Logger != nil {
-		Logger.Info(1, fmt.Sprintf(format, args...))
+	if l != nil {
+		l.Info(1, fmt.Sprintf(format, args...))
 	}
 }
 
+// Warning logs warning level log information.
 func Warning(args ...interface{}) {
-	if Logger != nil {
-		Logger.Warning(1, args...)
+	if l != nil {
+		l.Warning(1, args...)
 	}
 }
 
+// Warningf logs warning level log information.
 func Warningf(format string, args ...interface{}) {
-	if Logger != nil {
-		Logger.Warning(1, fmt.Sprintf(format, args...))
+	if l != nil {
+		l.Warning(1, fmt.Sprintf(format, args...))
 	}
 }
 
+// Error logs error level log information.
 func Error(args ...interface{}) {
-	if Logger != nil {
-		Logger.Error(1, args...)
+	if l != nil {
+		l.Error(1, args...)
 	}
 }
 
+// Errorf logs error level log information.
 func Errorf(format string, args ...interface{}) {
-	if Logger != nil {
-		Logger.Error(1, fmt.Sprintf(format, args...))
+	if l != nil {
+		l.Error(1, fmt.Sprintf(format, args...))
 	}
 }
 
+// Fatal logs fatal level log information.
 func Fatal(args ...interface{}) {
-	if Logger != nil {
-		Logger.Fatal(1, args...)
+	if l != nil {
+		l.Fatal(1, args...)
 	}
 }
 
+// Fatalf logs fatal level log information.
 func Fatalf(format string, args ...interface{}) {
-	if Logger != nil {
-		Logger.Fatal(1, fmt.Sprintf(format, args...))
+	if l != nil {
+		l.Fatal(1, fmt.Sprintf(format, args...))
 	}
 }

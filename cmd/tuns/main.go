@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/4396/tun/log"
+	"github.com/4396/tun/log/impl"
 	"github.com/4396/tun/server"
 	"github.com/4396/tun/version"
 	"gopkg.in/ini.v1"
@@ -95,6 +96,7 @@ var (
 
 func main() {
 	flag.Parse()
+	log.Use(&impl.Logger{})
 	log.Infof("Start tun server, version is %s", version.Version)
 
 	s, err := newServer(*conf)
