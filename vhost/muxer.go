@@ -10,9 +10,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/golang/sync/syncmap"
-
 	"github.com/4396/tun/fake"
+	"github.com/golang/sync/syncmap"
 )
 
 type Muxer struct {
@@ -47,7 +46,7 @@ func (m *Muxer) Listen(domain string) (l net.Listener, err error) {
 	}
 	_, loaded := m.domains.LoadOrStore(domain, l)
 	if loaded {
-		err = errors.New("")
+		err = errors.New("already listen the domain")
 	}
 	return
 }

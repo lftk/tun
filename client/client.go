@@ -15,11 +15,14 @@ import (
 	"github.com/golang/sync/syncmap"
 )
 
+// Error constants
 var (
+	// The network exception or the server shutdown caused the session to be closed.
 	ErrSessionClosed = errors.New("session closed")
-	ErrUnexpectedMsg = errors.New("unexpected message")
 )
 
+// Client connects to the server through the Dial function.
+// Multiple proxies can be established with the server.
 type Client struct {
 	service   proxy.Service
 	session   *mux.Session
@@ -28,6 +31,7 @@ type Client struct {
 	errc      chan error
 }
 
+// Dial returns a client that establishes a session with addr.
 func Dial(addr string) (c *Client, err error) {
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
@@ -81,11 +85,12 @@ func (c *Client) authProxy(id, token string) (err error) {
 	case *msg.Error:
 		err = errors.New(mm.Message)
 	default:
-		err = ErrUnexpectedMsg
+		err = errors.New("unexpected message type")
 	}
 	return
 }
 
+// Proxy establishes a proxy with the server.
 func (c *Client) Proxy(id, token, addr string) (err error) {
 	err = c.authProxy(id, token)
 	if err != nil {
@@ -104,6 +109,7 @@ func (c *Client) Proxy(id, token, addr string) (err error) {
 	return
 }
 
+// Run client handles many user requests that are forwarded over the server.
 func (c *Client) Run(ctx context.Context) (err error) {
 	connc := make(chan net.Conn, 16)
 	ctx, cancel := context.WithCancel(ctx)
@@ -158,24 +164,18 @@ func (c *Client) listen(ctx context.Context, connc chan<- net.Conn) {
 }
 
 func (c *Client) handleConn(conn net.Conn) {
-	var (
-		err    error
-		worker msg.Worker
-	)
-
-	defer func() {
-		if err != nil {
-			conn.Close()
-		}
-	}()
-
-	err = msg.ReadInto(conn, &worker)
+	var worker msg.Worker
+	err := msg.ReadInto(conn, &worker)
 	if err != nil {
+		conn.Close()
 		return
 	}
 
 	val, ok := c.listeners.Load(worker.ID)
 	if ok {
 		err = val.(*fake.Listener).Put(conn)
+		if err != nil {
+			conn.Close()
+		}
 	}
 }
