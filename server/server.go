@@ -33,16 +33,16 @@ type Config struct {
 	TraffOut TraffFunc
 }
 
-// TraffFunc record proxy's traffic.
+// TraffFunc records traffic for a proxy.
 type TraffFunc func(id string, b []byte)
 
-// AuthFunc authentication proxy through id and token.
+// AuthFunc using id and token to authorize a proxy.
 type AuthFunc func(id, token string) error
 
-// LoadFunc using loader to load proxy with id.
+// LoadFunc using loader to load a proxy with id.
 type LoadFunc func(loader Loader, id string) error
 
-// Listen tun address and http address, return a server.
+// Listen tun address and http address, create a server.
 func Listen(cfg *Config) (s *Server, err error) {
 	var (
 		listener net.Listener
@@ -75,16 +75,20 @@ func Listen(cfg *Config) (s *Server, err error) {
 	return
 }
 
+// Proxies returns all proxies.
 func (s *Server) Proxies() []proxy.Proxy {
 	return s.service.Proxies()
 }
 
+// Kill a proxy.
 func (s *Server) Kill(id string) {
 	s.sessions.Range(func(key, val interface{}) bool {
 		return !val.(*session).Kill(id)
 	})
 }
 
+// Run this server, receive various user connections
+// and client connections, and handle events.
 func (s *Server) Run(ctx context.Context) (err error) {
 	s.connc = make(chan net.Conn, 16)
 	ctx, cancel := context.WithCancel(ctx)
@@ -120,6 +124,7 @@ func (s *Server) Run(ctx context.Context) (err error) {
 	}
 }
 
+// listen tun address, receive client connections.
 func (s *Server) listen(ctx context.Context) (err error) {
 	defer s.listener.Close()
 	for {
@@ -140,6 +145,7 @@ func (s *Server) listen(ctx context.Context) (err error) {
 	}
 }
 
+// goctx using goroutine execute `do` function.
 func (s *Server) goctx(ctx context.Context, do func(context.Context) error) {
 	go func() {
 		if err := do(ctx); err != nil {
@@ -148,6 +154,7 @@ func (s *Server) goctx(ctx context.Context, do func(context.Context) error) {
 	}()
 }
 
+// handle the client's connection.
 func (s *Server) handleConn(ctx context.Context, conn net.Conn) {
 	sess, err := newSession(s, conn)
 	if err != nil {

@@ -11,10 +11,13 @@ var (
 	// Version describes the current version.
 	Version = "0.1.0"
 
+	// The server can be compatible with the minimum version of the client.
 	minClientVersion = "0.1.0"
+	// The client can be compatible with the minimum version of the server.
 	minServerVersion = "0.1.0"
 )
 
+// CompatClient is used by the server to determine whether the client is compatible.
 func CompatClient(ver string) (err error) {
 	b, err := compat(ver, minClientVersion)
 	if err != nil {
@@ -27,6 +30,7 @@ func CompatClient(ver string) (err error) {
 	return
 }
 
+// CompatServer is used by the client to determine whether the server is compatible.
 func CompatServer(ver string) (err error) {
 	b, err := compat(ver, minServerVersion)
 	if err != nil {
@@ -39,6 +43,7 @@ func CompatServer(ver string) (err error) {
 	return
 }
 
+// compat to determine whether two versions are compatible or not.
 func compat(ver, min string) (b bool, err error) {
 	n, err := compare(ver, min)
 	if err != nil {
@@ -49,6 +54,7 @@ func compat(ver, min string) (b bool, err error) {
 	return
 }
 
+// toInts splits the version number of the string format into an int slice.
 func toInts(ver string) (vv []int, err error) {
 	ss := strings.Split(ver, ".")
 	if len(ss) != 3 {
@@ -66,6 +72,7 @@ func toInts(ver string) (vv []int, err error) {
 	return
 }
 
+// compare two versions.
 func compare(v1, v2 string) (n int, err error) {
 	vv1, err := toInts(v1)
 	if err != nil {

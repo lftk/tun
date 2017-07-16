@@ -25,7 +25,7 @@ type proxyConn struct {
 	net.Conn
 }
 
-// Serve all proxies
+// Serve all proxies.
 func (s *Service) Serve(ctx context.Context) (err error) {
 	s.errc = make(chan error, 1)
 	s.connc = make(chan proxyConn, 16)

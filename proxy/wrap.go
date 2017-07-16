@@ -96,7 +96,7 @@ func (p *proxy) Handle(conn net.Conn, traff Traffic) (err error) {
 	return
 }
 
-// Wrap a connection, records traffic when reading and writing.
+// trafficConn combines Traffic and net.Conn.
 type trafficConn struct {
 	ID string
 	net.Conn
@@ -121,7 +121,7 @@ func (tc trafficConn) Write(b []byte) (n int, err error) {
 	return
 }
 
-// Join work connection and exchange data.
+// Join working connection and exchange data.
 func (tc trafficConn) Join(conn net.Conn) {
 	var wg sync.WaitGroup
 	pipe := func(from, to net.Conn) {

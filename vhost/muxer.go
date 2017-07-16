@@ -14,11 +14,13 @@ import (
 	"github.com/golang/sync/syncmap"
 )
 
+// Muxer is used to manage all subdomain listeners.
 type Muxer struct {
 	listener net.Listener
 	domains  syncmap.Map
 }
 
+// Listen an address to create a muxer.
 func Listen(addr string) (m *Muxer, err error) {
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -29,6 +31,7 @@ func Listen(addr string) (m *Muxer, err error) {
 	return
 }
 
+// Close this muxer and all subdomain listeners.
 func (m *Muxer) Close() error {
 	m.domains.Range(func(key, val interface{}) bool {
 		val.(*fake.Listener).Close()
@@ -38,6 +41,7 @@ func (m *Muxer) Close() error {
 	return m.listener.Close()
 }
 
+// Listen a subdomain to create a net.Listener.
 func (m *Muxer) Listen(domain string) (l net.Listener, err error) {
 	l = &listener{
 		Muxer:    m,
@@ -51,6 +55,8 @@ func (m *Muxer) Listen(domain string) (l net.Listener, err error) {
 	return
 }
 
+// Serve this muxer, resolves an http requests and
+// put the connection into the subdomain listener.
 func (m *Muxer) Serve(ctx context.Context) (err error) {
 	var conn net.Conn
 	for {
@@ -69,8 +75,10 @@ func (m *Muxer) Serve(ctx context.Context) (err error) {
 	}
 }
 
+// handleConn is used to resolve an http requests
+// and put the connection into the subdomain listener.
 func (m *Muxer) handleConn(conn net.Conn) {
-	domain, cc, err := subDomain(conn)
+	domain, cc, err := subdomain(conn)
 	if err != nil {
 		conn.Close()
 		return
@@ -90,23 +98,23 @@ func (m *Muxer) handleConn(conn net.Conn) {
 	}
 }
 
+// bufferConn combines bytes.Buffer and net.Conn.
 type bufferConn struct {
 	net.Conn
 	*bytes.Buffer
 }
 
+// Read data from bytes.Buffer and net.Conn.
 func (c bufferConn) Read(b []byte) (int, error) {
 	return io.MultiReader(c.Buffer, c.Conn).Read(b)
 }
 
+// Write data to net.Conn.
 func (c bufferConn) Write(b []byte) (int, error) {
 	return c.Conn.Write(b)
 }
 
-func (c bufferConn) Close() error {
-	return c.Conn.Close()
-}
-
+// readRequest resolves net.Conn to an http request.
 func readRequest(c net.Conn) (req *http.Request, bc net.Conn, err error) {
 	buf := bytes.NewBuffer(nil)
 	tr := io.TeeReader(c, buf)
@@ -120,7 +128,8 @@ func readRequest(c net.Conn) (req *http.Request, bc net.Conn, err error) {
 	return
 }
 
-func subDomain(c net.Conn) (sub string, bc net.Conn, err error) {
+// subdomain parses the subdomain from the net.Conn.
+func subdomain(c net.Conn) (sub string, bc net.Conn, err error) {
 	req, bc, err := readRequest(c)
 	if err != nil {
 		return

@@ -11,6 +11,8 @@ import (
 	"github.com/golang/sync/syncmap"
 )
 
+// session describes the connection to the client.
+// It also manages all of the proxies on that client.
 type session struct {
 	server  *Server
 	session *mux.Session
@@ -18,6 +20,7 @@ type session struct {
 	proxies syncmap.Map
 }
 
+// newSession wrap a conn to create a session.
 func newSession(s *Server, conn net.Conn) (sess *session, err error) {
 	ms, err := mux.Server(conn)
 	if err != nil {
@@ -38,6 +41,7 @@ func newSession(s *Server, conn net.Conn) (sess *session, err error) {
 	return
 }
 
+// Kill a proxy.
 func (s *session) Kill(id string) (ok bool) {
 	s.proxies.Range(func(key, val interface{}) bool {
 		ok = (id == key.(string))
@@ -49,6 +53,7 @@ func (s *session) Kill(id string) (ok bool) {
 	return
 }
 
+// Run this session and handle various commands.
 func (s *session) Run(ctx context.Context) (err error) {
 	defer func() {
 		s.cmd.Close()
@@ -86,6 +91,7 @@ func (s *session) Run(ctx context.Context) (err error) {
 	}
 }
 
+// handleProxy process the proxy login message.
 func (s *session) handleProxy(proxy *msg.Proxy) (err error) {
 	defer func() {
 		if err != nil {
