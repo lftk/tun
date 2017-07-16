@@ -6,9 +6,8 @@ import (
 	"sync"
 )
 
-var (
-	errClosed = errors.New("listener closed")
-)
+// Listener has been closed.
+var errClosed = errors.New("listener closed")
 
 // Listener is an implementation of net.Listener.
 // It receives incoming net.Conn through the Put method

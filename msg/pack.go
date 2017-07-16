@@ -8,6 +8,8 @@ import (
 	"reflect"
 )
 
+// Unpack []byte as a message. If `in` is nil,
+// the packet is unpacked by type `t`.
 func unpack(t byte, b []byte, in Message) (msg Message, err error) {
 	if in == nil {
 		if t >= byte(len(typeMsgs)) {
@@ -22,15 +24,18 @@ func unpack(t byte, b []byte, in Message) (msg Message, err error) {
 	return
 }
 
+// UnPackInto will unpack the []byte to `msg`.
 func UnPackInto(b []byte, msg Message) (err error) {
 	_, err = unpack(' ', b, msg)
 	return
 }
 
+// UnPack to a message according to type `t`.
 func UnPack(t byte, b []byte) (Message, error) {
 	return unpack(t, b, nil)
 }
 
+// Pack a message becomes []byte.
 func Pack(msg Message) (b []byte, err error) {
 	t, ok := msgTypes[typeof(msg)]
 	if !ok {

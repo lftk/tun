@@ -6,8 +6,10 @@ import (
 	"io"
 )
 
+// MaxMsgLength defines the maximum length of a message.
 var MaxMsgLength int64 = 1024
 
+// Gets the message type and message body from reader.
 func readMsg(r io.Reader) (t byte, b []byte, err error) {
 	var (
 		n  int64
@@ -46,6 +48,7 @@ func readMsg(r io.Reader) (t byte, b []byte, err error) {
 	return
 }
 
+// Read a message from reader.
 func Read(r io.Reader) (msg Message, err error) {
 	t, b, err := readMsg(r)
 	if err != nil {
@@ -56,6 +59,7 @@ func Read(r io.Reader) (msg Message, err error) {
 	return
 }
 
+// ReadInto read a message into `msg` from reader.
 func ReadInto(r io.Reader, msg Message) (err error) {
 	_, b, err := readMsg(r)
 	if err != nil {
@@ -66,6 +70,7 @@ func ReadInto(r io.Reader, msg Message) (err error) {
 	return
 }
 
+// Write a message to the writer.
 func Write(w io.Writer, msg interface{}) (err error) {
 	b, err := Pack(msg)
 	if err != nil {
