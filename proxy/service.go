@@ -8,6 +8,9 @@ import (
 	"github.com/golang/sync/syncmap"
 )
 
+// Service manages all proxies,
+// and handles all user connections,
+// and records all incoming and outgoing traffic.
 type Service struct {
 	Traff   Traffic
 	proxies syncmap.Map
@@ -16,11 +19,13 @@ type Service struct {
 	errc    chan error
 }
 
+// proxyConn combines Proxy and net.Conn.
 type proxyConn struct {
 	Proxy
 	net.Conn
 }
 
+// Serve all proxies
 func (s *Service) Serve(ctx context.Context) (err error) {
 	s.errc = make(chan error, 1)
 	s.connc = make(chan proxyConn, 16)
@@ -62,6 +67,7 @@ func (s *Service) Serve(ctx context.Context) (err error) {
 	}
 }
 
+// Proxy listens for a new proxy.
 func (s *Service) Proxy(p Proxy) (err error) {
 	_, loaded := s.proxies.LoadOrStore(p.ID(), p)
 	if loaded {
@@ -75,6 +81,7 @@ func (s *Service) Proxy(p Proxy) (err error) {
 	return
 }
 
+// Proxies returns all proxies.
 func (s *Service) Proxies() (proxies []Proxy) {
 	s.proxies.Range(func(key, val interface{}) bool {
 		proxies = append(proxies, val.(Proxy))
@@ -83,6 +90,7 @@ func (s *Service) Proxies() (proxies []Proxy) {
 	return
 }
 
+// Load returns a proxy.
 func (s *Service) Load(id string) (p Proxy, ok bool) {
 	val, ok := s.proxies.Load(id)
 	if ok {
@@ -91,6 +99,7 @@ func (s *Service) Load(id string) (p Proxy, ok bool) {
 	return
 }
 
+// Kill a proxy.
 func (s *Service) Kill(id string) {
 	val, ok := s.proxies.Load(id)
 	if ok {
@@ -100,6 +109,7 @@ func (s *Service) Kill(id string) {
 	return
 }
 
+// Register a dialer and bind to the proxy.
 func (s *Service) Register(id string, dialer Dialer) (err error) {
 	if val, ok := s.proxies.Load(id); ok {
 		err = val.(Proxy).Bind(dialer)
@@ -109,6 +119,7 @@ func (s *Service) Register(id string, dialer Dialer) (err error) {
 	return
 }
 
+// Unregister a dialer and unbind from the proxy.
 func (s *Service) Unregister(id string, dialer Dialer) (err error) {
 	if val, ok := s.proxies.Load(id); ok {
 		err = val.(Proxy).Unbind(dialer)
@@ -118,6 +129,7 @@ func (s *Service) Unregister(id string, dialer Dialer) (err error) {
 	return
 }
 
+// listens for a new proxy.
 func (s *Service) listenProxy(ctx context.Context, p Proxy) {
 	for {
 		conn, err := p.Accept()
@@ -134,6 +146,7 @@ func (s *Service) listenProxy(ctx context.Context, p Proxy) {
 	}
 }
 
+// handle the user's connection.
 func (s *Service) handleConn(ctx context.Context, pc proxyConn) {
 	select {
 	case <-ctx.Done():

@@ -7,7 +7,7 @@ import (
 	"sync"
 )
 
-// Wrap a net.Listener to generate a Proxy.
+// Wrap a net.Listener to create a Proxy.
 func Wrap(id string, listener net.Listener) Proxy {
 	return &proxy{
 		id:       id,
@@ -15,6 +15,7 @@ func Wrap(id string, listener net.Listener) Proxy {
 	}
 }
 
+// proxy is an implementation of Proxy.
 type proxy struct {
 	id       string
 	dialer   Dialer
@@ -22,10 +23,12 @@ type proxy struct {
 	listener net.Listener
 }
 
+// ID returns the id of proxy.
 func (p *proxy) ID() string {
 	return p.id
 }
 
+// Close the proxy and close the bound dialer.
 func (p *proxy) Close() error {
 	p.listener.Close()
 	p.mu.Lock()
@@ -36,6 +39,7 @@ func (p *proxy) Close() error {
 	return nil
 }
 
+// Accept returns the user's connection.
 func (p *proxy) Accept() (net.Conn, error) {
 	return p.listener.Accept()
 }
@@ -54,6 +58,7 @@ func (p *proxy) Bind(dialer Dialer) (err error) {
 	return
 }
 
+// Unbind a dialer that is already bound.
 func (p *proxy) Unbind(dialer Dialer) (err error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -67,6 +72,7 @@ func (p *proxy) Unbind(dialer Dialer) (err error) {
 	return
 }
 
+// Handle the user's connection.
 func (p *proxy) Handle(conn net.Conn, traff Traffic) (err error) {
 	var dialer Dialer
 	p.mu.RLock()
@@ -90,12 +96,14 @@ func (p *proxy) Handle(conn net.Conn, traff Traffic) (err error) {
 	return
 }
 
+// Wrap a connection, records traffic when reading and writing.
 type trafficConn struct {
 	ID string
 	net.Conn
 	Traffic
 }
 
+// Read data from conn and records traffic.
 func (tc trafficConn) Read(b []byte) (n int, err error) {
 	n, err = tc.Conn.Read(b)
 	if tc.Traffic != nil && n > 0 {
@@ -104,6 +112,7 @@ func (tc trafficConn) Read(b []byte) (n int, err error) {
 	return
 }
 
+// Write data to conn and records traffic.
 func (tc trafficConn) Write(b []byte) (n int, err error) {
 	n, err = tc.Conn.Write(b)
 	if tc.Traffic != nil && n > 0 {
@@ -112,6 +121,7 @@ func (tc trafficConn) Write(b []byte) (n int, err error) {
 	return
 }
 
+// Join work connection and exchange data.
 func (tc trafficConn) Join(conn net.Conn) {
 	var wg sync.WaitGroup
 	pipe := func(from, to net.Conn) {
