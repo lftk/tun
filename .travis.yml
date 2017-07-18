@@ -12,3 +12,7 @@ install:
   - go get github.com/pkg/errors
   - go get github.com/xtaci/smux
   - go get gopkg.in/ini.v1
+
+script:
+  - go build -ldflags "-w -s" -o bin/tunc cmd/tunc/*.go
+  - go build -ldflags "-w -s" -o bin/tuns cmd/tuns/*.go
