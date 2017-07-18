@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 
+	"github.com/4396/tun/log"
 	"github.com/4396/tun/msg"
 	"github.com/4396/tun/mux"
 	"github.com/4396/tun/version"
@@ -99,8 +100,10 @@ func (s *session) handleProxy(proxy *msg.Proxy) (err error) {
 		} else {
 			err = msg.Write(s.cmd, &msg.Version{Version: version.Version})
 			if err != nil {
+				log.Errorf("Failed to reply version to client, kill %s.", proxy.ID)
 				s.server.service.Kill(proxy.ID)
 			} else {
+				log.Infof("Register %s successfully.", proxy.ID)
 				s.proxies.Store(proxy.ID, nil)
 			}
 		}
@@ -108,14 +111,17 @@ func (s *session) handleProxy(proxy *msg.Proxy) (err error) {
 
 	err = version.CompatClient(proxy.Version)
 	if err != nil {
+		log.Errorf("Not compatible with client, version is %s.", proxy.Version)
 		return
 	}
 
 	if s.server.auth != nil {
 		err = s.server.auth(proxy.ID, proxy.Token)
 		if err != nil {
+			log.Errorf("Failed to auth %s, %v.", proxy.ID, err)
 			return
 		}
+		log.Infof("Auth %s successfully.", proxy.ID)
 	}
 
 	_, ok := s.server.service.Load(proxy.ID)
@@ -123,16 +129,21 @@ func (s *session) handleProxy(proxy *msg.Proxy) (err error) {
 		if s.server.load != nil {
 			err = s.server.load(&loader{s.server}, proxy.ID)
 		} else {
-			err = errors.New("Not exists proxy")
+			err = errors.New("proxy does not exists")
 		}
 	}
 	if err != nil {
+		log.Errorf("Failed to load %s, %v.", proxy.ID, err)
 		return
 	}
+	log.Infof("Load %s successfully.", proxy.ID)
 
 	err = s.server.service.Register(proxy.ID, &dialer{
 		Session: s.session,
 		ID:      proxy.ID,
 	})
+	if err != nil {
+		log.Errorf("Failed to register %s, %v.", proxy.ID, err)
+	}
 	return
 }

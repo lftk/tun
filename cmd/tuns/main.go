@@ -21,6 +21,7 @@ type tunServer struct {
 func newServer(conf string) (s *tunServer, err error) {
 	cfg, err := ini.Load(conf)
 	if err != nil {
+		log.Errorf("Failed to load configuration file, %v.", err)
 		return
 	}
 
@@ -38,6 +39,7 @@ func newServer(conf string) (s *tunServer, err error) {
 		TraffOut: s.TraffOut,
 	})
 	if err != nil {
+		log.Errorf("Failed to listen tun server, %v.", err)
 		return
 	}
 
@@ -83,11 +85,11 @@ func (s *tunServer) Load(loader server.Loader, id string) (err error) {
 }
 
 func (s *tunServer) TraffIn(id string, b []byte) {
-	log.Infof("[IN] %s %d", id, len(b))
+	log.Debugf("%d bytes came in on %s.", len(b), id)
 }
 
 func (s *tunServer) TraffOut(id string, b []byte) {
-	log.Infof("[OUT] %s %d", id, len(b))
+	log.Debugf("%d bytes went out on %s.", len(b), id)
 }
 
 var (
@@ -97,11 +99,11 @@ var (
 func main() {
 	flag.Parse()
 	log.Use(&impl.Logger{})
-	log.Infof("Start tun server, version is %s", version.Version)
+	log.Infof("Start tun server, version is %s.", version.Version)
 
 	s, err := newServer(*conf)
 	if err != nil {
-		log.Fatal(err)
+		return
 	}
-	log.Fatal(s.Run(context.Background()))
+	log.Error(s.Run(context.Background()))
 }
