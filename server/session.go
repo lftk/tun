@@ -100,10 +100,10 @@ func (s *session) handleProxy(proxy *msg.Proxy) (err error) {
 		} else {
 			err = msg.Write(s.cmd, &msg.Version{Version: version.Version})
 			if err != nil {
-				log.Errorf("Failed to reply version to client, kill %s.", proxy.ID)
+				log.Errorf("failed to reply version to client, proxy=%+v", proxy)
 				s.server.service.Kill(proxy.ID)
 			} else {
-				log.Infof("Register %s successfully.", proxy.ID)
+				log.Infof("load proxy successfully, proxy=%+v", proxy)
 				s.proxies.Store(proxy.ID, nil)
 			}
 		}
@@ -111,17 +111,16 @@ func (s *session) handleProxy(proxy *msg.Proxy) (err error) {
 
 	err = version.CompatClient(proxy.Version)
 	if err != nil {
-		log.Errorf("Not compatible with client, version is %s.", proxy.Version)
+		log.Errorf("not compatible with client, proxy=%+v", proxy)
 		return
 	}
 
 	if s.server.auth != nil {
 		err = s.server.auth(proxy.ID, proxy.Token)
 		if err != nil {
-			log.Errorf("Failed to auth %s, %v.", proxy.ID, err)
+			log.Errorf("failed to auth proxy, err=%v, proxy=%+v", err, proxy)
 			return
 		}
-		log.Infof("Auth %s successfully.", proxy.ID)
 	}
 
 	_, ok := s.server.service.Load(proxy.ID)
@@ -133,17 +132,16 @@ func (s *session) handleProxy(proxy *msg.Proxy) (err error) {
 		}
 	}
 	if err != nil {
-		log.Errorf("Failed to load %s, %v.", proxy.ID, err)
+		log.Errorf("failed to load proxy, err=%v, proxy=%+v", err, proxy)
 		return
 	}
-	log.Infof("Load %s successfully.", proxy.ID)
 
 	err = s.server.service.Register(proxy.ID, &dialer{
 		Session: s.session,
 		ID:      proxy.ID,
 	})
 	if err != nil {
-		log.Errorf("Failed to register %s, %v.", proxy.ID, err)
+		log.Errorf("failed to register dialer, err=%v, proxy=%+v", err, proxy)
 	}
 	return
 }

@@ -93,11 +93,11 @@ func loadConfig() (cfg *config, err error) {
 func main() {
 	flag.Parse()
 	log.Use(&impl.Logger{})
-	log.Infof("Start tun client, version is %s.", version.Version)
+	log.Infof("start tun client, version is %s", version.Version)
 
 	cfg, err := loadConfig()
 	if err != nil {
-		log.Errorf("Failed to load configuration file, %v.", err)
+		log.Errorf("failed to load configuration file, err=%v", err)
 		return
 	}
 
@@ -110,25 +110,25 @@ func main() {
 		if err != nil {
 			idx++
 			time.Sleep(time.Second)
-			log.Infof("%d times reconnect to tun server.", idx)
+			log.Infof("%d times reconnect to tun server", idx)
 			continue
 		}
-		log.Info("Connect to tun server successfully.")
+		log.Info("connect to tun server successfully")
 
 		for id, proxy := range cfg.Proxies {
 			err = c.Proxy(id, proxy.Token, proxy.Addr)
 			if err != nil {
-				log.Errorf("Failed to load %s, %v.", id, err)
+				log.Errorf("failed to load proxy, err=%v, proxy=%+v", err, proxy)
 				return
 			}
-			log.Infof("Load %s successfully.", id)
+			log.Infof("load proxy successfully, proxy=%+v", proxy)
 		}
 
 		idx = 0
 		err = c.Run(ctx)
 		if err != nil {
 			if err != client.ErrSessionClosed {
-				log.Errorf("Failed to run tun client, %v.", err)
+				log.Errorf("failed to run tun client, err=%v", err)
 				return
 			}
 		}

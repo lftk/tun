@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"flag"
-	"fmt"
 
 	"github.com/4396/tun/log"
 	"github.com/4396/tun/log/impl"
@@ -21,7 +20,7 @@ type tunServer struct {
 func newServer(conf string) (s *tunServer, err error) {
 	cfg, err := ini.Load(conf)
 	if err != nil {
-		log.Errorf("Failed to load configuration file, %v.", err)
+		log.Errorf("failed to load configuration file, err=%v", err)
 		return
 	}
 
@@ -39,7 +38,7 @@ func newServer(conf string) (s *tunServer, err error) {
 		TraffOut: s.TraffOut,
 	})
 	if err != nil {
-		log.Errorf("Failed to listen tun server, %v.", err)
+		log.Errorf("failed to listen tun server, err=%v", err)
 		return
 	}
 
@@ -50,7 +49,7 @@ func newServer(conf string) (s *tunServer, err error) {
 func (s *tunServer) Auth(id, token string) (err error) {
 	sec, err := s.proxies.GetSection(id)
 	if err != nil {
-		err = fmt.Errorf("proxy '%s' not exists", id)
+		err = errors.New("proxy does not exists")
 		return
 	}
 
@@ -63,7 +62,7 @@ func (s *tunServer) Auth(id, token string) (err error) {
 func (s *tunServer) Load(loader server.Loader, id string) (err error) {
 	sec, err := s.proxies.GetSection(id)
 	if err != nil {
-		err = fmt.Errorf("proxy '%s' not exists", id)
+		err = errors.New("proxy does not exists")
 		return
 	}
 
@@ -85,11 +84,11 @@ func (s *tunServer) Load(loader server.Loader, id string) (err error) {
 }
 
 func (s *tunServer) TraffIn(id string, b []byte) {
-	log.Debugf("%d bytes came in on %s.", len(b), id)
+	log.Debugf("%d bytes came in on %s", len(b), id)
 }
 
 func (s *tunServer) TraffOut(id string, b []byte) {
-	log.Debugf("%d bytes went out on %s.", len(b), id)
+	log.Debugf("%d bytes went out on %s", len(b), id)
 }
 
 var (
@@ -99,7 +98,7 @@ var (
 func main() {
 	flag.Parse()
 	log.Use(&impl.Logger{})
-	log.Infof("Start tun server, version is %s.", version.Version)
+	log.Infof("start tun server, version is %s", version.Version)
 
 	s, err := newServer(*conf)
 	if err != nil {
