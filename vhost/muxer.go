@@ -14,7 +14,7 @@ import (
 	"github.com/golang/sync/syncmap"
 )
 
-// Muxer is used to manage all subdomain listeners.
+// Muxer is used to manage all domain listeners.
 type Muxer struct {
 	listener net.Listener
 	domains  syncmap.Map
@@ -31,7 +31,7 @@ func Listen(addr string) (m *Muxer, err error) {
 	return
 }
 
-// Close this muxer and all subdomain listeners.
+// Close this muxer and all domain listeners.
 func (m *Muxer) Close() error {
 	m.domains.Range(func(key, val interface{}) bool {
 		val.(*fake.Listener).Close()
@@ -41,7 +41,7 @@ func (m *Muxer) Close() error {
 	return m.listener.Close()
 }
 
-// Listen a subdomain to create a net.Listener.
+// Listen a domain to create a net.Listener.
 func (m *Muxer) Listen(domain string) (l net.Listener, err error) {
 	l = &listener{
 		Muxer:    m,
@@ -55,8 +55,8 @@ func (m *Muxer) Listen(domain string) (l net.Listener, err error) {
 	return
 }
 
-// Serve this muxer, resolves an http requests and
-// put the connection into the subdomain listener.
+// Serve this muxer, resolves an http requests
+// and put the connection into the domain listener.
 func (m *Muxer) Serve(ctx context.Context) (err error) {
 	var conn net.Conn
 	for {
@@ -76,25 +76,26 @@ func (m *Muxer) Serve(ctx context.Context) (err error) {
 }
 
 // handleConn is used to resolve an http requests
-// and put the connection into the subdomain listener.
+// and put the connection into the bdomain listener.
 func (m *Muxer) handleConn(conn net.Conn) {
-	domain, cc, err := subdomain(conn)
+	req, bc, err := readRequest(conn)
 	if err != nil {
 		conn.Close()
 		return
 	}
 
-	val, ok := m.domains.Load(domain)
+	ss := strings.Split(req.Host, ":")
+	val, ok := m.domains.Load(ss[0])
 	if !ok {
 		// 404
-		cc.Close()
+		bc.Close()
 		return
 	}
 
-	err = val.(*listener).Put(cc)
+	err = val.(*listener).Put(bc)
 	if err != nil {
 		// 500
-		cc.Close()
+		bc.Close()
 	}
 }
 
@@ -125,19 +126,5 @@ func readRequest(c net.Conn) (req *http.Request, bc net.Conn, err error) {
 	}
 
 	bc = bufferConn{Conn: c, Buffer: buf}
-	return
-}
-
-// subdomain parses the subdomain from the net.Conn.
-func subdomain(c net.Conn) (sub string, bc net.Conn, err error) {
-	req, bc, err := readRequest(c)
-	if err != nil {
-		return
-	}
-
-	i := strings.Index(req.Host, ".")
-	if i != -1 {
-		sub = req.Host[:i]
-	}
 	return
 }

@@ -1,9 +1,11 @@
 package server
 
 import (
+	"errors"
 	"fmt"
 	"net"
 
+	"github.com/4396/tun/log"
 	"github.com/4396/tun/proxy"
 )
 
@@ -37,12 +39,20 @@ func (l *loader) ProxyTCP(id string, port int) (err error) {
 	err = l.Proxy(p)
 	if err != nil {
 		ln.Close()
+		return
 	}
+
+	log.Infof("tcp proxy, id=%s, port=%d", id, port)
 	return
 }
 
 // ProxyHTTP is used to load HTTP proxy.
 func (l *loader) ProxyHTTP(id, domain string) (err error) {
+	if l.muxer == nil {
+		err = errors.New("http proxy not supported")
+		return
+	}
+
 	ln, err := l.muxer.Listen(domain)
 	if err != nil {
 		return
@@ -52,6 +62,9 @@ func (l *loader) ProxyHTTP(id, domain string) (err error) {
 	err = l.Proxy(p)
 	if err != nil {
 		ln.Close()
+		return
 	}
+
+	log.Infof("http proxy, id=%s, domain=%s", id, domain)
 	return
 }

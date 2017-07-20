@@ -81,34 +81,35 @@ func (s *session) Run(ctx context.Context) (err error) {
 
 		switch mm := m.(type) {
 		case *msg.Proxy:
-			err = s.handleProxy(mm)
+			s.handleProxy(mm)
 		default:
-			// ...
-		}
-
-		if err != nil {
-			return
+			log.Errorf("unexpected message, %+v", mm)
 		}
 	}
 }
 
 // handleProxy process the proxy login message.
-func (s *session) handleProxy(proxy *msg.Proxy) (err error) {
-	defer func() {
-		if err != nil {
-			err = msg.Write(s.cmd, &msg.Error{Message: err.Error()})
-		} else {
-			err = msg.Write(s.cmd, &msg.Version{Version: version.Version})
-			if err != nil {
-				log.Errorf("failed to reply version to client, proxy=%+v", proxy)
-				s.server.service.Kill(proxy.ID)
-			} else {
-				log.Infof("load proxy successfully, proxy=%+v", proxy)
-				s.proxies.Store(proxy.ID, nil)
-			}
-		}
-	}()
+func (s *session) handleProxy(proxy *msg.Proxy) {
+	err := s.loadProxy(proxy)
+	if err != nil {
+		err = msg.Write(s.cmd, &msg.Error{Message: err.Error()})
+		return
+	}
 
+	err = msg.Write(s.cmd, &msg.Version{Version: version.Version})
+	if err != nil {
+		log.Errorf("failed to reply version to client, proxy=%+v", proxy)
+		s.server.service.Kill(proxy.ID)
+		return
+	}
+
+	log.Infof("load proxy successfully, proxy=%+v", proxy)
+	s.proxies.Store(proxy.ID, nil)
+	return
+}
+
+// loadProxy auth and load a proxy.
+func (s *session) loadProxy(proxy *msg.Proxy) (err error) {
 	err = version.CompatClient(proxy.Version)
 	if err != nil {
 		log.Errorf("not compatible with client, proxy=%+v", proxy)
@@ -128,7 +129,7 @@ func (s *session) handleProxy(proxy *msg.Proxy) (err error) {
 		if s.server.load != nil {
 			err = s.server.load(&loader{s.server}, proxy.ID)
 		} else {
-			err = errors.New("proxy does not exists")
+			err = errors.New("no loader")
 		}
 	}
 	if err != nil {

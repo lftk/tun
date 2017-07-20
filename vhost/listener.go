@@ -4,7 +4,7 @@ import (
 	"github.com/4396/tun/fake"
 )
 
-// listener is a subdomain listener.
+// listener is a domain listener.
 // That combines Muxer and fake.Listenr.
 type listener struct {
 	*Muxer
