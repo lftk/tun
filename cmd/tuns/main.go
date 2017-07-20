@@ -15,7 +15,6 @@ import (
 type tunServer struct {
 	*server.Server
 	proxies *ini.File
-	domain  string
 }
 
 func newServer(conf string) (s *tunServer, err error) {
@@ -26,17 +25,10 @@ func newServer(conf string) (s *tunServer, err error) {
 	}
 
 	sec := cfg.Section("tuns")
-	domain := sec.Key("domain").String()
 	addr := sec.Key("addr").MustString(":7000")
 	http := sec.Key("http").MustString(":7070")
 
-	if http != "" && domain == "" {
-		err = errors.New("need to configure domain")
-		log.Errorf("need to configure domain when listen http address")
-		return
-	}
-
-	s = &tunServer{proxies: cfg, domain: domain}
+	s = &tunServer{proxies: cfg}
 	svr, err := server.Listen(&server.Config{
 		Addr:     addr,
 		AddrHTTP: http,
@@ -83,8 +75,7 @@ func (s *tunServer) Load(loader server.Loader, id string) (err error) {
 		}
 		err = loader.ProxyTCP(id, port)
 	case "http":
-		subdomain := sec.Key("domain").String()
-		domain := subdomain + "." + s.domain
+		domain := sec.Key("domain").String()
 		err = loader.ProxyHTTP(id, domain)
 	default:
 		err = errors.New("unexpected proxy type")
