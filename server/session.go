@@ -47,6 +47,7 @@ func (s *session) Kill(id string) (ok bool) {
 	s.proxies.Range(func(key, val interface{}) bool {
 		ok = (id == key.(string))
 		if ok {
+			log.Infof("proxy killed, id=%s", id)
 			s.server.service.Kill(id)
 		}
 		return !ok
@@ -61,6 +62,7 @@ func (s *session) Run(ctx context.Context) (err error) {
 		s.session.Close()
 
 		s.proxies.Range(func(key, val interface{}) bool {
+			log.Infof("proxy exited, id=%s", key.(string))
 			s.server.service.Kill(key.(string))
 			return true
 		})
@@ -103,7 +105,7 @@ func (s *session) handleProxy(proxy *msg.Proxy) {
 		return
 	}
 
-	log.Infof("load proxy successfully, proxy=%+v", proxy)
+	log.Infof("load proxy success, proxy=%+v", proxy)
 	s.proxies.Store(proxy.ID, nil)
 	return
 }

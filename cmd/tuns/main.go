@@ -84,15 +84,15 @@ func (s *tunServer) Load(loader server.Loader, id string) (err error) {
 }
 
 func (s *tunServer) TraffIn(id string, b []byte) {
-	log.Debugf("%d bytes came in on %s", len(b), id)
+	log.Debugf("%s came in %d bytes", id, len(b))
 }
 
 func (s *tunServer) TraffOut(id string, b []byte) {
-	log.Debugf("%d bytes went out on %s", len(b), id)
+	log.Debugf("%s went out %d bytes", id, len(b))
 }
 
 var (
-	conf = flag.String("c", "conf/tuns.ini", "config file's path")
+	conf = flag.String("c", "tuns.ini", "config file's path")
 )
 
 func main() {
