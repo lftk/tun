@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	conf   = flag.String("c", "conf/tunc.ini", "config file's path")
+	conf   = flag.String("c", "tunc.ini", "config file's path")
 	server = flag.String("server", "", "tun server addr")
 	id     = flag.String("id", "", "tun proxy id")
 	token  = flag.String("token", "", "tun proxy token")
@@ -113,7 +113,7 @@ func main() {
 			log.Infof("%d times reconnect to tun server", idx)
 			continue
 		}
-		log.Info("connect to tun server successfully")
+		log.Info("connect to tun server success")
 
 		for id, proxy := range cfg.Proxies {
 			err = c.Proxy(id, proxy.Token, proxy.Addr)
@@ -121,7 +121,7 @@ func main() {
 				log.Errorf("failed to load proxy, err=%v, proxy=%+v", err, proxy)
 				return
 			}
-			log.Infof("load proxy successfully, proxy=%+v", proxy)
+			log.Infof("load proxy success, proxy=%+v", proxy)
 		}
 
 		idx = 0
