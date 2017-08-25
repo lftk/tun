@@ -6,13 +6,13 @@ import (
 	"net"
 	"os"
 	"runtime"
+	"sync"
 
 	"github.com/4396/tun/fake"
 	"github.com/4396/tun/msg"
 	"github.com/4396/tun/mux"
 	"github.com/4396/tun/proxy"
 	"github.com/4396/tun/version"
-	"github.com/golang/sync/syncmap"
 )
 
 // Error constants
@@ -26,7 +26,7 @@ var (
 type Client struct {
 	service   proxy.Service
 	session   *mux.Session
-	listeners syncmap.Map
+	listeners sync.Map
 	cmd       net.Conn
 	errc      chan error
 }

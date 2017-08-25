@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"net"
+	"sync"
 
 	"github.com/4396/tun/log"
 	"github.com/4396/tun/msg"
 	"github.com/4396/tun/mux"
 	"github.com/4396/tun/version"
-	"github.com/golang/sync/syncmap"
 )
 
 // session describes the connection to the client.
@@ -18,7 +18,7 @@ type session struct {
 	server  *Server
 	session *mux.Session
 	cmd     net.Conn
-	proxies syncmap.Map
+	proxies sync.Map
 }
 
 // newSession wrap a conn to create a session.

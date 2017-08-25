@@ -3,10 +3,10 @@ package server
 import (
 	"context"
 	"net"
+	"sync"
 
 	"github.com/4396/tun/proxy"
 	"github.com/4396/tun/vhost"
-	"github.com/golang/sync/syncmap"
 )
 
 // Server combination net.Listener and vhost.Muxer, manage all proxies.
@@ -19,7 +19,7 @@ type Server struct {
 	auth     AuthFunc
 	load     LoadFunc
 	service  proxy.Service
-	sessions syncmap.Map
+	sessions sync.Map
 	errc     chan error
 }
 

@@ -4,8 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
-
-	"github.com/golang/sync/syncmap"
+	"sync"
 )
 
 // Service manages all proxies,
@@ -13,7 +12,7 @@ import (
 // and records all incoming and outgoing traffic.
 type Service struct {
 	Traff   Traffic
-	proxies syncmap.Map
+	proxies sync.Map
 	proxyc  chan Proxy
 	connc   chan proxyConn
 	errc    chan error
