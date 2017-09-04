@@ -17,8 +17,8 @@ var (
 	conf   = flag.String("c", "tunc.ini", "config file's path")
 	server = flag.String("server", "", "tun server addr")
 	id     = flag.String("id", "", "tun proxy id")
+	addr   = flag.String("addr", "", "local server addr")
 	token  = flag.String("token", "", "tun proxy token")
-	addr   = flag.String("addr", "", "tun proxy local addr")
 )
 
 type proxy struct {
@@ -118,10 +118,10 @@ func main() {
 		for id, proxy := range cfg.Proxies {
 			err = c.Proxy(id, proxy.Token, proxy.Addr)
 			if err != nil {
-				log.Errorf("failed to load proxy, err=%v, proxy=%+v", err, proxy)
+				log.Errorf("failed to load proxy, err=%v, id=%s, addr=%s", err, id, proxy.Addr)
 				return
 			}
-			log.Infof("load proxy success, proxy=%+v", proxy)
+			log.Infof("load proxy success, id=%s, addr=%s", id, proxy.Addr)
 		}
 
 		idx = 0
