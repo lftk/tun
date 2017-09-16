@@ -1,14 +1,12 @@
 language: go
 
 go:
-  - 1.7
-  - 1.8
+  - 1.9
   - master
 
 install:
   - go get github.com/golang/glog
   - go get github.com/golang/snappy
-  - go get github.com/golang/sync/syncmap
   - go get github.com/pkg/errors
   - go get github.com/xtaci/smux
   - go get gopkg.in/ini.v1

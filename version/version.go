@@ -9,7 +9,7 @@ import (
 
 var (
 	// Version describes the current version.
-	Version = "0.1.1"
+	Version = "0.1.2"
 
 	// The server can be compatible with the minimum version of the client.
 	minClientVersion = "0.1.0"

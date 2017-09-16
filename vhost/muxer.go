@@ -9,15 +9,15 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/4396/tun/fake"
-	"github.com/golang/sync/syncmap"
 )
 
 // Muxer is used to manage all domain listeners.
 type Muxer struct {
 	listener net.Listener
-	domains  syncmap.Map
+	domains  sync.Map
 }
 
 // Listen an address to create a muxer.

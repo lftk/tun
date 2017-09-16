@@ -6,19 +6,19 @@ import (
 	"net"
 	"os"
 	"runtime"
+	"sync"
 
 	"github.com/4396/tun/fake"
 	"github.com/4396/tun/msg"
 	"github.com/4396/tun/mux"
 	"github.com/4396/tun/proxy"
 	"github.com/4396/tun/version"
-	"github.com/golang/sync/syncmap"
 )
 
 // Error constants
 var (
 	// The network exception or the server shutdown caused the session to be closed.
-	ErrSessionClosed = errors.New("session closed")
+	ErrClosed = errors.New("session closed")
 )
 
 // Client connects to the server through the Dial function.
@@ -26,7 +26,7 @@ var (
 type Client struct {
 	service   proxy.Service
 	session   *mux.Session
-	listeners syncmap.Map
+	listeners sync.Map
 	cmd       net.Conn
 	errc      chan error
 }
@@ -71,11 +71,17 @@ func (c *Client) authProxy(id, token string) (err error) {
 		Arch:     runtime.GOARCH,
 	})
 	if err != nil {
+		if c.session.IsClosed() {
+			err = ErrClosed
+		}
 		return
 	}
 
 	m, err := msg.Read(c.cmd)
 	if err != nil {
+		if c.session.IsClosed() {
+			err = ErrClosed
+		}
 		return
 	}
 
@@ -146,11 +152,16 @@ func (c *Client) Run(ctx context.Context) (err error) {
 	}
 }
 
+// IsClosed to determine whether this client was closed.
+func (c *Client) IsClosed() bool {
+	return c.session.IsClosed()
+}
+
 func (c *Client) listen(ctx context.Context, connc chan<- net.Conn) {
 	for {
 		conn, err := c.session.AcceptConn()
 		if err != nil {
-			c.errc <- ErrSessionClosed
+			c.errc <- ErrClosed
 			return
 		}
 

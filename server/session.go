@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"net"
+	"sync"
 
 	"github.com/4396/tun/log"
 	"github.com/4396/tun/msg"
 	"github.com/4396/tun/mux"
 	"github.com/4396/tun/version"
-	"github.com/golang/sync/syncmap"
 )
 
 // session describes the connection to the client.
@@ -18,7 +18,7 @@ type session struct {
 	server  *Server
 	session *mux.Session
 	cmd     net.Conn
-	proxies syncmap.Map
+	proxies sync.Map
 }
 
 // newSession wrap a conn to create a session.
@@ -83,18 +83,22 @@ func (s *session) Run(ctx context.Context) (err error) {
 
 		switch mm := m.(type) {
 		case *msg.Proxy:
-			s.handleProxy(mm)
+			err = s.handleProxy(mm)
 		default:
 			log.Errorf("unexpected message, %+v", mm)
+		}
+
+		if err != nil {
+			return
 		}
 	}
 }
 
 // handleProxy process the proxy login message.
-func (s *session) handleProxy(proxy *msg.Proxy) {
-	err := s.loadProxy(proxy)
+func (s *session) handleProxy(proxy *msg.Proxy) (err error) {
+	err = s.loadProxy(proxy)
 	if err != nil {
-		err = msg.Write(s.cmd, &msg.Error{Message: err.Error()})
+		msg.Write(s.cmd, &msg.Error{Message: err.Error()})
 		return
 	}
 
