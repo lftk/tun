@@ -102,35 +102,45 @@ func main() {
 	}
 
 	var (
-		idx int64
-		ctx = context.Background()
+		count int64
+		first = true
+		ctx   = context.Background()
 	)
-	for {
-		c, err := client.Dial(cfg.Server)
-		if err != nil {
-			idx++
-			time.Sleep(time.Second)
-			log.Infof("%d times reconnect to tun server", idx)
-			continue
-		}
-		log.Info("connect to tun server success")
 
-		for id, proxy := range cfg.Proxies {
-			err = c.Proxy(id, proxy.Token, proxy.Addr)
-			if err != nil {
-				log.Errorf("failed to load proxy, err=%v, id=%s, addr=%s", err, id, proxy.Addr)
-				return
-			}
-			log.Infof("load proxy success, id=%s, addr=%s", id, proxy.Addr)
-		}
+LOOP:
+	if first {
+		first = false
+	} else {
+		count++
+		time.Sleep(time.Second)
+		log.Infof("%d times reconnect to tun server", count)
+	}
 
-		idx = 0
-		err = c.Run(ctx)
+	c, err := client.Dial(cfg.Server)
+	if err != nil {
+		goto LOOP
+	}
+
+	count = 0
+	log.Info("connect to tun server success")
+
+	for id, proxy := range cfg.Proxies {
+		err = c.Proxy(id, proxy.Token, proxy.Addr)
 		if err != nil {
-			if err != client.ErrSessionClosed {
-				log.Errorf("failed to run tun client, err=%v", err)
-				return
+			if err == client.ErrClosed {
+				goto LOOP
 			}
+			log.Errorf("failed to load proxy, err=%v, id=%s, addr=%s", err, id, proxy.Addr)
+			return
 		}
+		log.Infof("load proxy success, id=%s, addr=%s", id, proxy.Addr)
+	}
+
+	err = c.Run(ctx)
+	if err != nil {
+		if err == client.ErrClosed {
+			goto LOOP
+		}
+		log.Errorf("failed to run tun client, err=%v", err)
 	}
 }

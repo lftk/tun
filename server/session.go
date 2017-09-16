@@ -83,18 +83,22 @@ func (s *session) Run(ctx context.Context) (err error) {
 
 		switch mm := m.(type) {
 		case *msg.Proxy:
-			s.handleProxy(mm)
+			err = s.handleProxy(mm)
 		default:
 			log.Errorf("unexpected message, %+v", mm)
+		}
+
+		if err != nil {
+			return
 		}
 	}
 }
 
 // handleProxy process the proxy login message.
-func (s *session) handleProxy(proxy *msg.Proxy) {
-	err := s.loadProxy(proxy)
+func (s *session) handleProxy(proxy *msg.Proxy) (err error) {
+	err = s.loadProxy(proxy)
 	if err != nil {
-		err = msg.Write(s.cmd, &msg.Error{Message: err.Error()})
+		msg.Write(s.cmd, &msg.Error{Message: err.Error()})
 		return
 	}
 
